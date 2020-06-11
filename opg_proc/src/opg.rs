@@ -1,16 +1,18 @@
 use proc_macro2::{Group, Span, TokenStream, TokenTree};
 use quote::quote;
+use syn::export::ToTokens;
 use syn::Meta::*;
 use syn::NestedMeta::*;
 
 use crate::parsing_context::*;
+use crate::symbol::*;
 
 pub fn impl_derive_example(
     ast: syn::DeriveInput,
 ) -> Result<proc_macro2::TokenStream, Vec<syn::Error>> {
     let name = &ast.ident;
 
-    let mut params = ExampleDeriveParams::default();
+    let mut params = StructOrEnumParams::default();
 
     let cx = ParsingContext::new();
 
@@ -26,7 +28,7 @@ pub fn impl_derive_example(
                     params.with = Some(with);
                 }
             }
-            Lit(syn::Lit::Str(value)) => params.example = value.parse::<syn::Ident>().ok(),
+            Lit(syn::Lit::Str(value)) => params.example = Some(value.value()),
             other => cx.error_spanned_by(other, "unknown attribute parameter"),
         }
     }
@@ -53,21 +55,20 @@ pub fn impl_derive_example(
 }
 
 #[derive(Default)]
-struct ExampleDeriveParams {
-    example: Option<syn::Ident>,
-    with: Option<syn::Ident>,
+struct StructOrEnumParams {
+    example: Option<String>,
+    with: Option<syn::ExprPath>,
 }
 
 fn get_meta_items(cx: &ParsingContext, attr: &syn::Attribute) -> Result<Vec<syn::NestedMeta>, ()> {
-    if !attr.path.is_ident(ATTRIBUTE_NAME) {
-        println!("aaa");
+    if attr.path != OPG {
         return Ok(Vec::new());
     }
 
     match attr.parse_meta() {
         Ok(List(meta)) => Ok(meta.nested.into_iter().collect()),
         Ok(other) => {
-            cx.error_spanned_by(other, "expected #[example(...)]");
+            cx.error_spanned_by(other, format!("expected #[{}(...)]", OPG));
             Err(())
         }
         Err(err) => {
@@ -81,7 +82,7 @@ fn parse_lit_into_expr_path(
     cx: &ParsingContext,
     attr_name: &'static str,
     lit: &syn::Lit,
-) -> Result<syn::Ident, ()> {
+) -> Result<syn::ExprPath, ()> {
     let string = get_lit_str(cx, attr_name, lit)?;
     parse_lit_str(string).map_err(|_| {
         cx.error_spanned_by(
@@ -137,5 +138,3 @@ fn get_lit_str<'a>(
         Err(())
     }
 }
-
-const ATTRIBUTE_NAME: &'static str = "example";

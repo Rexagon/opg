@@ -2,13 +2,16 @@ extern crate proc_macro2;
 extern crate quote;
 extern crate syn;
 
-mod example;
+mod attr;
+mod name;
+mod opg;
 mod parsing_context;
+mod symbol;
 
 use proc_macro::TokenStream;
 use quote::quote;
 
-use self::example::*;
+use self::opg::*;
 
 #[proc_macro_derive(Example, attributes(example))]
 pub fn derive_example(input: TokenStream) -> TokenStream {

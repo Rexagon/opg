@@ -11,7 +11,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_simple() {
+    fn test_super() {
         #[derive(Serialize, Example)]
         struct Test {
             asd: u32,
