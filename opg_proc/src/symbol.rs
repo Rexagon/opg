@@ -21,13 +21,14 @@ define_symbols! {
 
     // flags
     STRING => "string",
+    STRING_ENUM => "string_enum",
     NUMBER => "number",
     INTEGER => "integer",
     BOOLEAN => "boolean",
     ARRAY => "array",
     OBJECT => "object",
 
-    INJECT => "inject",
+    INLINE => "inline",
 }
 
 #[derive(Copy, Clone)]

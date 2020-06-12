@@ -1,3 +1,5 @@
+mod opg;
+
 pub use opg_proc::*;
 
 use serde::Serialize;
