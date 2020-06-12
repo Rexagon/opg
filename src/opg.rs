@@ -2,6 +2,10 @@ use std::collections::BTreeMap;
 
 use serde::Serialize;
 
+pub trait OpgModel {
+    fn get_structure() -> Model;
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct Model {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -47,7 +51,7 @@ pub struct ModelSimple {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub example: Option<Vec<String>>,
+    pub example: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -74,12 +78,148 @@ pub enum ModelReference {
     Inline(Model),
 }
 
+trait FromStrangeTuple<T> {
+    fn extract(self) -> Option<T>;
+}
+
+impl<T> FromStrangeTuple<T> for () {
+    fn extract(self) -> Option<T> {
+        None
+    }
+}
+
+impl<T> FromStrangeTuple<T> for (T,) {
+    fn extract(self) -> Option<T> {
+        Some(self.0)
+    }
+}
+
+macro_rules! describe_type(
+    (string => {
+        $(description: $description:literal)?
+        $(format: $format:literal)?
+        $(example: $example:literal)?
+        $(variants: [$($variants:literal),*])?
+    }) => {
+        Model {
+            description: ($($description.to_string(),)?).extract(),
+            data: ModelData::Single(ModelTypeDescription::String(ModelString {
+                variants: ($(vec![$($variants.to_string()),*])?,).extract(),
+                data: ModelSimple {
+                    format: ($($format.to_string(),)?).extract(),
+                    example: ($($example.to_string(),)?).extract(),
+                }
+            }))
+        }
+    };
+
+    (number => {
+        $(description: $description:literal)?
+        $(format: $format:literal)?
+        $(example: $example:literal)?
+    }) => {
+        Model {
+            description: ($($description.to_string(),)?).extract(),
+            data: ModelData::Single(ModelTypeDescription::Number(ModelSimple {
+                format: ($($format.to_string(),)?).extract(),
+                example: ($($example.to_string(),)?).extract(),
+            }))
+        }
+    };
+
+    (integer => {
+        $(description: $description:literal)?
+        $(format: $format:literal)?
+        $(example: $example:literal)?
+    }) => {
+        Model {
+            description: ($($description.to_string(),)?).extract(),
+            data: ModelData::Single(ModelTypeDescription::Integer(ModelSimple {
+                format: ($($format.to_string(),)?).extract(),
+                example: ($($example.to_string(),)?).extract(),
+            }))
+        }
+    };
+
+    (boolean => {
+        $(description: $description:literal)?
+    }) => {
+        Model {
+            description: ($($description.to_string(),)?).extract(),
+            data: ModelData::Single(ModelTypeDescription::Boolean)
+        }
+    };
+
+    (object => {
+        $(description: $description:literal)?
+        properties: {
+            $($property_name:ident$([$required:tt])?: ($($property_tail:tt)*))*
+        }
+    }) => {{
+        let mut properties = BTreeMap::new();
+        let mut required = Vec::new();
+
+        $(describe_type!(@object_property [properties, required] $property_name$([$required])?: ($($property_tail)*)));*;
+
+        Model {
+            description: ($($description.to_string(),)?).extract(),
+            data: ModelData::Single(ModelTypeDescription::Object(ModelObject {
+                properties,
+                required,
+            }))
+        }
+    }};
+
+    (@object_property [$properties:ident, $required:ident] $property_name:ident: ($($property_tail:tt)*)) => {
+        $properties.insert(stringify!($property_name).to_string(), describe_type!(@object_property_value $($property_tail)*));
+    };
+
+
+    (@object_property [$properties:ident, $required:ident] $property_name:ident[required]: ($($property_tail:tt)*)) => {
+        describe_type!(@object_property [$properties, $required] $property_name: ($($property_tail)*));
+        $required.push(stringify!($property_name).to_owned());
+    };
+
+    (@object_property_value link => $ref:ty) => {
+        ModelReference::Link(ModelReferenceLink {
+            reference: concat!("#/components/schemas/", stringify!($ref)).to_owned()
+        })
+    };
+
+    (@object_property_value $type:ident => $($tail:tt)*) => {
+        ModelReference::Inline(describe_type!($type => $($tail)*))
+    }
+);
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_serialization() {
+        let test = describe_type!(object => {
+            description: "Hello world"
+            properties: {
+                id[required]: (link => TransactionId)
+                test[required]: (object => {
+                    properties: {
+                        sub: (link => TransactionId)
+                    }
+                })
+                test_object: (string => {
+                    format: "uuid"
+                    variants: ["aaa", "bbb"]
+                })
+                test_integer: (integer => {
+                    format: "timestamp"
+                    example: "1591956576404"
+                })
+                test_boolean: (boolean => {})
+            }
+        });
+
+        println!("{}", serde_yaml::to_string(&test).unwrap());
+
         let model = Model {
             description: Some("Some type".to_owned()),
             data: ModelData::Single(ModelTypeDescription::Object(ModelObject {
