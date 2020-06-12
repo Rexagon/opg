@@ -1,6 +1,63 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
+use itertools::*;
 use serde::Serialize;
+
+pub struct OpgContext {
+    models: BTreeMap<String, Model>,
+}
+
+impl OpgContext {
+    pub fn new() -> Self {
+        Self {
+            models: BTreeMap::new(),
+        }
+    }
+
+    pub fn contains_model(&self, name: &str) -> bool {
+        self.models.contains_key(name)
+    }
+
+    pub fn verify_models(&self) -> Result<(), Vec<&str>> {
+        let invalid_links = self
+            .models
+            .iter()
+            .flat_map(|(_, model)| match &model.data {
+                ModelData::Single(single) => Either::Left(std::iter::once(single)),
+                ModelData::OneOf(multiple) => Either::Right(multiple.one_of.iter()),
+            })
+            .filter_map(|type_description| match type_description {
+                ModelTypeDescription::Array(ModelArray { items }) => match items.as_ref() {
+                    ModelReference::Link(link) => {
+                        Some(Either::Left(std::iter::once(link.reference.as_str())))
+                    }
+                    _ => None,
+                },
+                ModelTypeDescription::Object(object) => {
+                    Some(Either::Right(object.properties.iter().filter_map(
+                        |(_, property)| match property {
+                            ModelReference::Link(link) => Some(link.reference.as_str()),
+                            _ => None,
+                        },
+                    )))
+                }
+                _ => None,
+            })
+            .flatten()
+            .fold(Vec::new(), |mut invalid_links, link| {
+                if !self.models.contains_key(link) {
+                    invalid_links.push(link);
+                }
+                invalid_links
+            });
+
+        if invalid_links.is_empty() {
+            Ok(())
+        } else {
+            Err(invalid_links)
+        }
+    }
+}
 
 pub trait OpgModel {
     fn get_structure() -> Model;
@@ -56,7 +113,7 @@ pub struct ModelSimple {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ModelArray {
-    pub items: Vec<ModelReference>,
+    pub items: Box<ModelReference>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -95,6 +152,20 @@ impl<T> FromStrangeTuple<T> for (T,) {
 }
 
 macro_rules! describe_type(
+    (raw_model => $model:ident) => {
+        $model
+    };
+
+    (raw_type => {
+        $(description: $description:literal)?
+        ident: $type:ident
+    }) => {
+        Model {
+            description: ($($description.to_string(),)?).extract(),
+            data: $type,
+        }
+    };
+
     (string => {
         $(description: $description:literal)?
         $(format: $format:literal)?
@@ -104,7 +175,7 @@ macro_rules! describe_type(
         Model {
             description: ($($description.to_string(),)?).extract(),
             data: ModelData::Single(ModelTypeDescription::String(ModelString {
-                variants: ($(vec![$($variants.to_string()),*])?,).extract(),
+                variants: ($(vec![$($variants.to_string()),*],)?).extract(),
                 data: ModelSimple {
                     format: ($($format.to_string(),)?).extract(),
                     example: ($($example.to_string(),)?).extract(),
@@ -147,6 +218,18 @@ macro_rules! describe_type(
         Model {
             description: ($($description.to_string(),)?).extract(),
             data: ModelData::Single(ModelTypeDescription::Boolean)
+        }
+    };
+
+    (array => {
+        $(description: $description:literal)?
+        items: ($($property_tail:tt)*)
+    }) => {
+        Model {
+            description: ($($description.to_string(),)?).extract(),
+            data: ModelData::Single(ModelTypeDescription::Array(ModelArray {
+                items: Box::new(describe_type!(@object_property_value $($property_tail)*))
+            }))
         }
     };
 
@@ -197,29 +280,6 @@ mod tests {
 
     #[test]
     fn test_serialization() {
-        let test = describe_type!(object => {
-            description: "Hello world"
-            properties: {
-                id[required]: (link => TransactionId)
-                test[required]: (object => {
-                    properties: {
-                        sub: (link => TransactionId)
-                    }
-                })
-                test_object: (string => {
-                    format: "uuid"
-                    variants: ["aaa", "bbb"]
-                })
-                test_integer: (integer => {
-                    format: "timestamp"
-                    example: "1591956576404"
-                })
-                test_boolean: (boolean => {})
-            }
-        });
-
-        println!("{}", serde_yaml::to_string(&test).unwrap());
-
         let model = Model {
             description: Some("Some type".to_owned()),
             data: ModelData::Single(ModelTypeDescription::Object(ModelObject {
@@ -273,6 +333,76 @@ required:
   - currency
   - paymentType
   - status"##
+        );
+    }
+
+    #[test]
+    fn test_macro() {
+        let sub = describe_type!(string => {
+            description: "Test"
+        });
+
+        let model = describe_type!(object => {
+            description: "Hello world"
+            properties: {
+                id[required]: (link => TransactionId)
+                test[required]: (object => {
+                    properties: {
+                        sub: (link => TransactionId)
+                    }
+                })
+                test_object: (string => {
+                    format: "uuid"
+                    variants: ["aaa", "bbb"]
+                })
+                test_integer: (integer => {
+                    format: "timestamp"
+                    example: "1591956576404"
+                })
+                test_boolean: (boolean => {})
+                test_array: (array => {
+                    items: (string => {})
+                })
+                test_raw_model: (raw_model => sub)
+            }
+        });
+
+        assert_eq!(
+            serde_yaml::to_string(&model).unwrap(),
+            r##"---
+description: Hello world
+type: object
+properties:
+  id:
+    $ref: "#/components/schemas/TransactionId"
+  test:
+    type: object
+    properties:
+      sub:
+        $ref: "#/components/schemas/TransactionId"
+    required: []
+  test_array:
+    type: array
+    items:
+      type: string
+  test_boolean:
+    type: boolean
+  test_integer:
+    type: integer
+    format: timestamp
+    example: "1591956576404"
+  test_object:
+    type: string
+    enum:
+      - aaa
+      - bbb
+    format: uuid
+  test_raw_model:
+    description: Test
+    type: string
+required:
+  - id
+  - test"##
         );
     }
 }
