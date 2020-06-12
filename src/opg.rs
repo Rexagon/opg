@@ -1,6 +1,7 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::BTreeMap;
 
 use itertools::*;
+use serde::export::fmt::Display;
 use serde::Serialize;
 
 pub struct OpgContext {
@@ -14,8 +15,16 @@ impl OpgContext {
         }
     }
 
+    #[inline(always)]
     pub fn contains_model(&self, name: &str) -> bool {
         self.models.contains_key(name)
+    }
+
+    pub fn add_model<N>(&mut self, name: N, model: Model) -> Option<Model>
+    where
+        N: Display,
+    {
+        self.models.insert(prepare_model_reference(name), model)
     }
 
     pub fn verify_models(&self) -> Result<(), Vec<&str>> {
@@ -151,6 +160,13 @@ impl<T> FromStrangeTuple<T> for (T,) {
     }
 }
 
+fn prepare_model_reference<N>(name: N) -> String
+where
+    N: Display,
+{
+    format!("{}{}", SCHEMA_REFERENCE_PREFIX, name)
+}
+
 macro_rules! describe_type(
     (raw_model => $model:ident) => {
         $model
@@ -263,9 +279,15 @@ macro_rules! describe_type(
         $required.push(stringify!($property_name).to_owned());
     };
 
-    (@object_property_value link => $ref:ty) => {
+    (@object_property_value link => $ref:literal) => {
         ModelReference::Link(ModelReferenceLink {
-            reference: concat!("#/components/schemas/", stringify!($ref)).to_owned()
+            reference: format!("{}{}", SCHEMA_REFERENCE_PREFIX, $ref)
+        })
+    };
+
+    (@object_property_value link => $ref:ident) => {
+        ModelReference::Link(ModelReferenceLink {
+            reference: format!("{}{}", SCHEMA_REFERENCE_PREFIX, $ref)
         })
     };
 
@@ -345,10 +367,10 @@ required:
         let model = describe_type!(object => {
             description: "Hello world"
             properties: {
-                id[required]: (link => TransactionId)
+                id[required]: (link => "TransactionId")
                 test[required]: (object => {
                     properties: {
-                        sub: (link => TransactionId)
+                        sub: (link => "TransactionId")
                     }
                 })
                 test_object: (string => {
@@ -405,4 +427,52 @@ required:
   - test"##
         );
     }
+
+    #[test]
+    fn test_valid_models_context() {
+        let mut cx = OpgContext::new();
+
+        cx.add_model(
+            "TransactionId",
+            describe_type!(string => {
+                description: "Transaction UUID"
+                format: "uuid"
+                example: "000..000-000..000-00..00"
+            }),
+        );
+
+        cx.add_model(
+            "SomeResponse",
+            describe_type!(object => {
+                properties: {
+                    id: (link => "TransactionId")
+                }
+            }),
+        );
+
+        assert_eq!(cx.verify_models(), Ok(()));
+    }
+
+    #[test]
+    fn test_invalid_models_context() {
+        let mut cx = OpgContext::new();
+
+        let invalid_link = "TransactionId";
+
+        cx.add_model(
+            "SomeResponse",
+            describe_type!(object => {
+                properties: {
+                    id: (link => invalid_link)
+                }
+            }),
+        );
+
+        assert_eq!(
+            cx.verify_models(),
+            Err(vec![prepare_model_reference(invalid_link).as_str()])
+        );
+    }
 }
+
+pub const SCHEMA_REFERENCE_PREFIX: &'static str = "#/components/schemas/";

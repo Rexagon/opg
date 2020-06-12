@@ -1,11 +1,24 @@
 mod opg;
 
+pub use opg::*;
 pub use opg_proc::*;
 
 use serde::Serialize;
 
-pub trait Example: Serialize {
-    fn example() -> Option<String>;
+#[cfg(feature = "test_compilation")]
+mod test_compilation {
+    use super::*;
+
+    fn test_string() -> String {
+        "AAA".to_owned()
+    }
+
+    #[derive(Serialize, OpgModel)]
+    #[opg(with = "test_string")]
+    #[serde(rename_all = "camelCase")]
+    struct TempTest {
+        asd: u32,
+    }
 }
 
 #[cfg(test)]
@@ -14,7 +27,7 @@ mod tests {
 
     #[test]
     fn test_super() {
-        #[derive(Serialize, Example)]
+        #[derive(Serialize, Opg)]
         struct Test {
             asd: u32,
         }
@@ -28,8 +41,8 @@ mod tests {
             "Hello World".to_owned()
         }
 
-        #[derive(Serialize, Example)]
-        #[example(with = "create_string")]
+        #[derive(Serialize, Opg)]
+        #[opg(with = "create_string")]
         struct Test {
             asd: u32,
         }
