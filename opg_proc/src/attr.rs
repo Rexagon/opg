@@ -21,6 +21,8 @@ pub struct Container {
     pub has_flatten: bool,
 
     pub description: Option<String>,
+    pub format: Option<String>,
+    pub example: Option<String>,
     pub inline: bool,
     pub model_type: ModelType,
 }
@@ -35,6 +37,8 @@ impl Container {
         let mut content = Attr::none(cx, CONTENT);
 
         let mut description = Attr::none(cx, DESCRIPTION);
+        let mut format = Attr::none(cx, FORMAT);
+        let mut example = Attr::none(cx, EXAMPLE);
         let mut inline = BoolAttr::none(cx, INLINE);
         let mut model_type = OneOfFlagsAttr::none(cx);
 
@@ -105,6 +109,16 @@ impl Container {
                         description.set(lit, s.value().clone());
                     }
                 }
+                (AttrFrom::Opg, Meta(NameValue(m))) if &m.path == FORMAT => {
+                    if let Ok(s) = get_lit_str(cx, FORMAT, &m.lit) {
+                        format.set(&m.path, s.value().clone())
+                    }
+                }
+                (AttrFrom::Opg, Meta(NameValue(m))) if &m.path == EXAMPLE => {
+                    if let Ok(s) = get_lit_str(cx, EXAMPLE, &m.lit) {
+                        example.set(&m.path, s.value().clone())
+                    }
+                }
                 (AttrFrom::Opg, Meta(Path(word))) if word == INLINE => inline.set_true(word),
                 (AttrFrom::Opg, Meta(Path(word))) => {
                     if let Ok(t) = ModelType::from_path(word) {
@@ -137,6 +151,8 @@ impl Container {
             tag_type,
             has_flatten: false,
             description: description.get(),
+            format: format.get(),
+            example: example.get(),
             inline: inline.get(),
             model_type,
         }
@@ -816,7 +832,8 @@ impl<'c, T> VecAttr<'c, T> {
 }
 
 pub struct Name {
-    name: String,
+    source_name: String,
+    serialized_name: String,
     renamed: bool,
 }
 
@@ -826,9 +843,14 @@ impl Name {
         let renamed = serialized_name.is_some();
 
         Self {
-            name: serialized_name.unwrap_or_else(|| source_name.clone()),
+            source_name: source_name.clone(),
+            serialized_name: serialized_name.unwrap_or_else(|| source_name.clone()),
             renamed,
         }
+    }
+
+    pub fn raw(&self) -> String {
+        self.source_name.clone()
     }
 
     pub fn serialize(&self) -> String {

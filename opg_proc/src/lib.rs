@@ -4,7 +4,9 @@ extern crate syn;
 
 mod ast;
 mod attr;
+mod bound;
 mod case;
+mod fragment;
 mod opg;
 mod parsing_context;
 mod symbol;

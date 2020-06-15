@@ -70,6 +70,16 @@ impl OpgContext {
 
 pub trait OpgModel {
     fn get_structure() -> Model;
+    fn get_structure_with_params(params: &ContextParams) -> Model {
+        Self::get_structure().apply_params(params)
+    }
+}
+
+pub struct ContextParams {
+    pub description: Option<String>,
+    pub variants: Option<Vec<String>>,
+    pub format: Option<String>,
+    pub example: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -80,11 +90,32 @@ pub struct Model {
     pub data: ModelData,
 }
 
+impl Model {
+    #[inline(always)]
+    pub fn apply_params(mut self, params: &ContextParams) -> Self {
+        if let Some(description) = &params.description {
+            self.description = Some(description.clone());
+        }
+        self.data = self.data.apply_params(params);
+        self
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum ModelData {
     Single(ModelTypeDescription),
     OneOf(ModelOneOf),
+}
+
+impl ModelData {
+    #[inline(always)]
+    pub fn apply_params(mut self, params: &ContextParams) -> Self {
+        match self {
+            ModelData::Single(data) => Modeldata::Single(data.apply_params(params)),
+            one_of => one_of, // TODO: apply params to oneOf
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -104,6 +135,24 @@ pub enum ModelTypeDescription {
     Object(ModelObject),
 }
 
+impl ModelTypeDescription {
+    #[inline(always)]
+    pub fn apply_params(mut self, params: &ContextParams) -> Self {
+        match self {
+            ModelTypeDescription::String(string) => {
+                ModelTypeDescription::String(string.apply_params(params))
+            }
+            ModelTypeDescription::Number(number) => {
+                ModelTypeDescription::Number(number.apply_params(params))
+            }
+            ModelTypeDescription::Integer(integer) => {
+                ModelTypeDescription::Integer(integer.apply_params(params))
+            }
+            other => other,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct ModelString {
     #[serde(rename = "enum", skip_serializing_if = "Option::is_none")]
@@ -112,12 +161,36 @@ pub struct ModelString {
     pub data: ModelSimple,
 }
 
+impl ModelString {
+    #[inline(always)]
+    pub fn apply_params(mut self, params: &ContextParams) -> Self {
+        if let Some(variants) = &params.variants {
+            self.variants = Some(variants.clone());
+        }
+        self.data = self.data.apply_params(params);
+        self
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct ModelSimple {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub example: Option<String>,
+}
+
+impl ModelSimple {
+    #[inline(always)]
+    pub fn apply_params(mut self, params: &ContextParams) -> Self {
+        if let Some(format) = &params.format {
+            self.format = Some(format.clone());
+        }
+        if let Some(example) = &params.example {
+            self.example = Some(example.clone());
+        }
+        self
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -296,12 +369,48 @@ macro_rules! describe_type(
     }
 );
 
+macro_rules! impl_opg_model(
+    ($type:ty => $serialized_type:ident) => {
+        impl OpgModel for $type {
+            fn get_structure() -> Model {
+                describe_type!($serialized_type => {})
+            }
+        }
+
+        impl OpgModel for Vec<$type> {
+            fn get_structure() -> Model {
+                describe_type!(array => {
+                    items: ($serialized_type => {})
+                })
+            }
+        }
+    };
+);
+
+impl_opg_model!(String => string);
+
+impl_opg_model!(i8 => integer);
+impl_opg_model!(u8 => integer);
+impl_opg_model!(i16 => integer);
+impl_opg_model!(u16 => integer);
+impl_opg_model!(i32 => integer);
+impl_opg_model!(u32 => integer);
+impl_opg_model!(i64 => integer);
+impl_opg_model!(u64 => integer);
+
+impl_opg_model!(f32 => number);
+impl_opg_model!(f64 => number);
+
+impl_opg_model!(bool => boolean);
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_serialization() {
+        let test = <String as OpgModel>::get_structure();
+
         let model = Model {
             description: Some("Some type".to_owned()),
             data: ModelData::Single(ModelTypeDescription::Object(ModelObject {
