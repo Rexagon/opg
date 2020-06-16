@@ -7,7 +7,7 @@ use syn::NestedMeta::*;
 
 use crate::ast::*;
 use crate::attr;
-use crate::attr::ModelType;
+use crate::attr::{ModelType, TagType};
 use crate::parsing_context::*;
 use crate::symbol::*;
 
@@ -30,7 +30,7 @@ pub fn impl_derive_example(
 
 fn serialize_body(container: &Container) -> proc_macro2::TokenStream {
     match &container.data {
-        //Data::Enum(variants) => serialize_enum(container, variants),
+        Data::Enum(variants) => serialize_enum(container, variants),
         Data::Struct(StructStyle::Struct, fields) => serialize_struct(container, fields),
         Data::Struct(StructStyle::Tuple, fields) => serialize_tuple_struct(container, fields),
         Data::Struct(StructStyle::NewType, fields) => {
@@ -40,12 +40,203 @@ fn serialize_body(container: &Container) -> proc_macro2::TokenStream {
     }
 }
 
+fn serialize_enum(container: &Container, variants: &Vec<Variant>) -> proc_macro2::TokenStream {
+    let type_name = &container.ident;
+
+    return match (container.attrs.model_type, &container.attrs.tag_type) {
+        (ModelType::NewTypeString, _) => serialize_newtype_enum(container, variants),
+        (ModelType::Object, TagType::Adjacent { tag, content }) => {
+            serialize_adjacent_tagged_enum(container, variants, tag, content)
+        }
+        (ModelType::Dictionary, _) => todo!(),
+        (ModelType::OneOf, TagType::None) => serialize_untagged_enum(container, variants),
+        (ModelType::OneOf, TagType::Internal { tag }) => {
+            serialize_internal_tagged_enum(container, variants, tag)
+        }
+        _ => unreachable!(),
+    };
+}
+
+fn serialize_newtype_enum(
+    container: &Container,
+    variants: &Vec<Variant>,
+) -> proc_macro2::TokenStream {
+    let type_name = &container.ident;
+
+    let description = option_string(&container.attrs.description);
+
+    let variants = variants
+        .iter()
+        .filter(|variant| !variant.attrs.skip_serializing)
+        .map(|variant| variant.attrs.name.serialized())
+        .collect::<Vec<_>>();
+
+    let example = option_string(&variants.first().cloned());
+
+    quote! {
+        impl opg::OpgModel for #type_name {
+            fn get_structure() -> opg::Model {
+                opg::Model {
+                    description: #description,
+                    data: opg::ModelData::Single(opg::ModelTypeDescription::String(opg::ModelString {
+                        variants: Some(vec![#(#variants.to_owned()),*]),
+                        data: opg::ModelSimple {
+                            format: None,
+                            example: #example,
+                        }
+                    }))
+                }
+            }
+        }
+    }
+}
+
+fn serialize_untagged_enum(
+    container: &Container,
+    variants: &Vec<Variant>,
+) -> proc_macro2::TokenStream {
+    let type_name = &container.ident;
+
+    let description = option_string(&container.attrs.description);
+
+    let one_of = variants
+        .iter()
+        .filter(|variant| !variant.attrs.skip_serializing)
+        .map(|variant| match &variant.style {
+            StructStyle::Unit => {
+                let variant_name = variant.attrs.name.serialized();
+
+                let description = option_string(&variant.attrs.description);
+
+                if variant.attrs.inline {
+                    let member_type_name = &variant.fields[0].original.ty;
+
+                    quote! {
+                        opg::ModelReference::Inline(<#member_type_name>::get_structure_with_params(&opg::ContextParams {
+                            description: #description,
+                            variants: None,
+                            format: None,
+                            example: None,
+                        }))
+                    }
+                } else {
+                    let member_type_name = stringify_type(&variant.fields[0].original.ty);
+
+                    quote! {
+                        opg::ModelReference::Link(opg::ModelReferenceLink {
+                            reference: #member_type_name.to_owned(),
+                        })
+                    }
+                }
+            }
+            StructStyle::Struct => {
+                let variant_name = variant.attrs.name.serialized();
+
+                let description = option_string(&variant.attrs.description);
+
+                let data = variant.fields.iter().filter(|field| !field.attrs.skip_serializing).map(|field| {
+                    let field_model = if container.attrs.inline || field.attrs.inline {
+                        let member_type_name = &field.original.ty;
+
+                        let description = option_string(&field.attrs.description);
+                        // TODO: add variants attr
+                        // TODO: add format attr
+                        // TODO: add example attr
+
+                        quote! {
+                            opg::ModelReference::Inline(<#member_type_name>::get_structure_with_params(&opg::ContextParams {
+                                description: #description,
+                                variants: None,
+                                format: None,
+                                example: None,
+                            }))
+                        }
+                    } else {
+                        let member_type_name = stringify_type(&field.original.ty);
+
+                        quote! {
+                            opg::ModelReference::Link(opg::ModelReferenceLink {
+                                reference: #member_type_name.to_owned(),
+                            })
+                        }
+                    };
+
+                    let property_name = syn::LitStr::new(&field.attrs.name.serialized(), Span::call_site());
+
+                    let push_required = if !field.attrs.optional {
+                        quote!( required.push(#property_name.to_owned()) )
+                    } else {
+                        quote!()
+                    };
+
+                    quote!{
+                        properties.insert(#property_name.to_owned(), #field_model);
+                        #push_required;
+                    }
+                }).collect::<Vec<_>>();
+
+                quote! {
+                    opg::ModelReference::Inline(opg::Model {
+                        description: #description,
+                        data: opg::ModelData::Single({
+                            let mut properties = std::collections::BTreeMap::new();
+                            let mut required = Vec::new();
+
+                            #(#data)*
+
+                            opg::ModelTypeDescription::Object(opg::ModelObject {
+                                properties,
+                                required,
+                            })
+                        })
+                    })
+                }
+            }
+            _ => unreachable!(),
+        })
+        .collect::<Vec<_>>();
+
+    quote! {
+        impl opg::OpgModel for #type_name {
+            fn get_structure() -> opg::Model {
+                opg::Model {
+                    description: #description,
+                    data: opg::ModelData::OneOf(opg::ModelOneOf {
+                        one_of: vec![#(#one_of),*],
+                    })
+                }
+            }
+        }
+    }
+}
+
+fn serialize_adjacent_tagged_enum(
+    container: &Container,
+    variants: &Vec<Variant>,
+    tag: &str,
+    content: &str,
+) -> proc_macro2::TokenStream {
+    todo!()
+}
+
+fn serialize_internal_tagged_enum(
+    container: &Container,
+    variants: &Vec<Variant>,
+    tag: &str,
+) -> proc_macro2::TokenStream {
+    let type_name = &container.ident;
+
+    let description = option_string(&container.attrs.description);
+
+    todo!()
+}
+
 fn serialize_struct(container: &Container, fields: &Vec<Field>) -> proc_macro2::TokenStream {
     let type_name = &container.ident;
 
     let description = option_string(&container.attrs.description);
 
-    let data = fields.iter().map(|field| {
+    let data = fields.iter().filter(|field| !field.attrs.skip_serializing).map(|field| {
         let field_model = if container.attrs.inline || field.attrs.inline {
             let member_type_name = &field.original.ty;
 

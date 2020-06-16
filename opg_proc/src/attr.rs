@@ -367,25 +367,18 @@ impl Field {
 
 #[derive(Copy, Clone)]
 pub enum ModelType {
-    EnumString,
     NewTypeString,
     NewTypeInteger,
     NewTypeNumber,
     NewTypeBoolean,
     NewTypeArray,
     Object,
+    Dictionary,
     OneOf,
     Any,
 }
 
 impl ModelType {
-    fn is_enum_string(&self) -> bool {
-        match self {
-            ModelType::EnumString => true,
-            _ => false,
-        }
-    }
-
     fn is_newtype(&self) -> bool {
         match self {
             ModelType::NewTypeString
@@ -399,9 +392,7 @@ impl ModelType {
 
     fn from_path(p: &syn::Path) -> Result<Self, ()> {
         // can't use match here ;(
-        if p == ENUM_STRING {
-            Ok(ModelType::EnumString)
-        } else if p == STRING {
+        if p == STRING {
             Ok(ModelType::NewTypeString)
         } else if p == NUMBER {
             Ok(ModelType::NewTypeNumber)
@@ -456,22 +447,34 @@ fn decide_model_type(
 
     match (&input.data, model_type) {
         (syn::Data::Enum(_), None) => match tag_type {
-            TagType::None => ModelType::OneOf,
-            _ => ModelType::Object,
+            TagType::None | TagType::Internal { .. } => ModelType::OneOf,
+            TagType::External => ModelType::Dictionary,
+            TagType::Adjacent { .. } => ModelType::Object,
         },
-        (syn::Data::Enum(syn::DataEnum { variants, .. }), Some(model_type))
-            if model_type.is_enum_string() =>
-        {
+        (syn::Data::Enum(_), Some(ModelType::OneOf)) => match tag_type {
+            TagType::None => ModelType::OneOf,
+            _ => {
+                cx.error_spanned_by(
+                    &input.ident,
+                    "only untagged enums are supported by `enum_string`",
+                );
+                ModelType::Any
+            }
+        },
+        (syn::Data::Enum(syn::DataEnum { variants, .. }), Some(ModelType::NewTypeString)) => {
             for variant in variants {
-                if let syn::Fields::Named(_) = &variant.fields {
-                    cx.error_spanned_by(
-                        &input.ident,
-                        "named struct variants are not suitable for `enum_string`",
-                    );
-                    break;
+                match &variant.fields {
+                    syn::Fields::Unit => {}
+                    _ => {
+                        cx.error_spanned_by(
+                            &input.ident,
+                            "only unit variants are supported by enum as `string`",
+                        );
+                        break;
+                    }
                 }
             }
-            model_type
+            ModelType::NewTypeString
         }
         (syn::Data::Struct(syn::DataStruct { fields, .. }), None) => match fields {
             syn::Fields::Named(_) => ModelType::Object,
