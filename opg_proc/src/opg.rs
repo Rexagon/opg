@@ -8,7 +8,6 @@ use syn::NestedMeta::*;
 use crate::ast::*;
 use crate::attr;
 use crate::attr::ModelType;
-use crate::fragment::*;
 use crate::parsing_context::*;
 use crate::symbol::*;
 
@@ -22,119 +21,190 @@ pub fn impl_derive_example(
     };
     cx.check()?;
 
-    let ident = &container.ident;
+    let result = serialize_body(&container);
 
-    Ok(proc_macro2::TokenStream::new())
+    println!("{}", result.to_string());
+
+    Ok(result)
 }
 
-struct Parameters {
-    self_var: syn::Ident,
-    this: syn::Path,
-}
-
-impl Parameters {
-    fn new(container: &Container) -> Self {
-        let self_var = syn::Ident::new("self", Span::call_site());
-        let this = container.ident.clone().into();
-
-        Parameters { self_var, this }
+fn serialize_body(container: &Container) -> proc_macro2::TokenStream {
+    match &container.data {
+        //Data::Enum(variants) => serialize_enum(container, variants),
+        Data::Struct(StructStyle::Struct, fields) => serialize_struct(container, fields),
+        Data::Struct(StructStyle::Tuple, fields) => serialize_tuple_struct(container, fields),
+        Data::Struct(StructStyle::NewType, fields) => {
+            serialize_newtype_struct(container, &fields[0])
+        }
+        _ => unimplemented!(),
     }
 }
 
-fn serialize_body(container: &Container, params: &Parameters) -> Fragment {
-    if container.attrs.transparent {
-        serialize_transparent(container, params)
-    } else {
-        match &container.data {
-            Data::Enum(variants) => serialize_enum(params, variants, &container.attrs),
-            Data::Struct(StructStyle::Struct, fields) => {
-                serialize_struct(params, fields, &container.attrs)
+fn serialize_struct(container: &Container, fields: &Vec<Field>) -> proc_macro2::TokenStream {
+    let type_name = &container.ident;
+
+    let description = option_string(&container.attrs.description);
+
+    let data = fields.iter().map(|field| {
+        let field_model = if container.attrs.inline || field.attrs.inline {
+            let member_type_name = &field.original.ty;
+
+            let description = option_string(&field.attrs.description);
+            // TODO: add variants attr
+            // TODO: add format attr
+            // TODO: add example attr
+
+            quote! {
+                opg::ModelReference::Inline(<#member_type_name>::get_structure_with_params(&opg::ContextParams {
+                    description: #description,
+                    variants: None,
+                    format: None,
+                    example: None,
+                }))
             }
-            Data::Struct(StructStyle::Tuple, fields) => {
-                serialize_tuple_struct(params, fields, &container.attrs)
+        } else {
+            let member_type_name = stringify_type(&field.original.ty);
+
+            quote! {
+                opg::ModelReference::Link(opg::ModelReferenceLink {
+                    reference: #member_type_name.to_owned(),
+                })
             }
-            Data::Struct(StructStyle::NewType, fields) => {
-                serialize_newtype_struct(params, &fields[0], &container.attrs)
+        };
+
+        let property_name = syn::LitStr::new(&field.attrs.name.serialized(), Span::call_site());
+
+        let push_required = if !field.attrs.optional {
+            quote!( required.push(#property_name.to_owned()) )
+        } else {
+            quote!()
+        };
+
+        quote!{
+            properties.insert(#property_name.to_owned(), #field_model);
+            #push_required;
+        }
+    }).collect::<Vec<_>>();
+
+    quote! {
+        impl opg::OpgModel for #type_name {
+            fn get_structure() -> opg::Model {
+                let mut properties = std::collections::BTreeMap::new();
+                let mut required = Vec::new();
+
+                #(#data)*
+
+                opg::Model {
+                    description: #description,
+                    data: opg::ModelData::Single(opg::ModelTypeDescription::Object(
+                        opg::ModelObject {
+                            properties,
+                            required,
+                        }
+                    ))
+                }
             }
-            _ => unimplemented!(),
         }
     }
 }
 
-fn serialize_transparent(container: &Container, params: &Parameters) -> Fragment {
-    let fields = match &container.data {
-        Data::Struct(_, fields) => fields,
-        Data::Enum(_) => unreachable!(),
+fn serialize_tuple_struct(container: &Container, fields: &Vec<Field>) -> proc_macro2::TokenStream {
+    let type_name = &container.ident;
+
+    let description = option_string(&container.attrs.description);
+
+    let data = fields
+        .iter()
+        .map(|field| {
+            if container.attrs.inline {
+                let member_type_name = &field.original.ty;
+
+                quote! {
+                    opg::ModelReference::Inline(<#member_type_name>::get_structure())
+                }
+            } else {
+                let member_type_name = stringify_type(&field.original.ty);
+
+                quote! {
+                    opg::ModelReference::Link(opg::ModelReferenceLink {
+                        reference: #member_type_name.to_owned(),
+                    })
+                }
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let one_of = quote! {
+        opg::Model {
+            description: None,
+            data: opg::ModelData::OneOf(opg::ModelOneOf {
+                one_of: vec![#(#data),*],
+            })
+        }
     };
 
-    let self_var = &params.self_var;
-    let transparent_field = fields.iter().find(|f| f.attrs.transparent).unwrap();
-    let member = &transparent_field.member;
-
-    let path = {
-        let span = transparent_field.original.span();
-        quote_spanned!(span=> )
-    };
-
-    Fragment::Block(quote! {
-        #path()
-    })
+    quote! {
+        impl opg::OpgModel for #type_name {
+            fn get_structure() -> opg::Model {
+                opg::Model {
+                    description: #description,
+                    data: opg::ModelData::Single(opg::ModelTypeDescription::Array(
+                        opg::ModelArray {
+                            items: Box::new(opg::ModelReference::Inline(#one_of)),
+                        }
+                    ))
+                }
+            }
+        }
+    }
 }
 
-fn serialize_newtype_struct(
-    params: &Parameters,
-    field: &Field,
-    attrs: &attr::Container,
-) -> proc_macro2::TokenStream {
-    let type_name = attrs.name.raw();
+fn serialize_newtype_struct(container: &Container, field: &Field) -> proc_macro2::TokenStream {
+    let type_name = &container.ident;
 
-    let member_type_name: syn::Type = field.member_type.clone();
+    let description = option_string(&container.attrs.description);
+    let format = option_string(&container.attrs.format);
+    let example = option_string(&container.attrs.example);
 
-    let description = option_string(&attrs.description);
-    let format = option_string(&attrs.format);
-    let example = option_string(&attrs.example);
+    let member_type_name = &field.original.ty;
 
-    let data = match attrs.model_type {
-        ModelType::NewTypeString => quote_spanned! {span=>
+    let data = match container.attrs.model_type {
+        ModelType::NewTypeString => quote! {
             opg::ModelTypeDescription::String(opg::ModelString {
-                variants: vec![],
+                variants: None,
                 data: opg::ModelSimple {
                     format: #format,
                     example: #example,
                 }
             })
         },
-        ModelType::NewTypeInteger => quote_spanned! {span=>
+        ModelType::NewTypeInteger => quote! {
             opg::ModelTypeDescription::Integer(opg::ModelSimple {
                 format: #format,
                 example: #example,
             })
         },
-        ModelType::NewTypeNumber => quote_spanned! {span=>
+        ModelType::NewTypeNumber => quote! {
             opg::ModelTypeDescription::Number(opg::ModelSimple {
                 format: #format,
                 example: #example,
             })
         },
-        ModelType::NewTypeBoolean => quote_spanned! {span=>
+        ModelType::NewTypeBoolean => quote! {
             opg::ModelTypeDescription::Boolean
         },
-        ModelType::NewTypeArray if attrs.inline => quote_spanned! {span=>
+        ModelType::NewTypeArray if container.attrs.inline => quote! {
             opg::ModelTypeDescription::Array(opg::ModelArray {
-                items: Box::new(opg::ModelReference::Inline(#member_type_name::get_structure()))
+                items: Box::new(opg::ModelReference::Inline(<#member_type_name>::get_structure()))
             })
         },
         ModelType::NewTypeArray => {
-            let member_type_name = member_type_name
-                .to_token_stream()
-                .to_string()
-                .replace(' ', "");
-            let member_type_name = syn::LitStr::new(member_type_name.as_str(), Span::call_site());
+            let member_type_name = stringify_type(member_type_name);
 
-            quote_spanned! {span=>
+            quote! {
                 opg::ModelTypeDescription::Array(opg::ModelArray {
                     items: Box::new(opg::ModelReference::Link(opg::ModelReferenceLink {
-                        reference: #member_type_name,
+                        reference: #member_type_name.to_owned(),
                     }))
                 })
             }
@@ -142,7 +212,7 @@ fn serialize_newtype_struct(
         _ => unreachable!(),
     };
 
-    quote_spanned! {span=>
+    quote! {
         impl opg::OpgModel for #type_name {
             fn get_structure() -> opg::Model {
                 opg::Model {
@@ -164,9 +234,7 @@ fn option_string(data: &Option<String>) -> proc_macro2::TokenStream {
     }
 }
 
-fn get_member(params: &Parameters, _field: &Field, member: &syn::Member) -> TokenStream {
-    let self_var = &params.self_var;
-    quote! {
-        &#self_var.#member
-    }
+fn stringify_type(ty: &syn::Type) -> syn::LitStr {
+    let name = ty.to_token_stream().to_string().replace(' ', "");
+    syn::LitStr::new(name.as_str(), Span::call_site())
 }

@@ -29,7 +29,6 @@ pub struct Variant<'a> {
 
 pub struct Field<'a> {
     pub member: syn::Member,
-    pub member_type: syn::Type,
     pub attrs: attr::Field,
     pub ty: &'a syn::Type,
     pub original: &'a syn::Field,
@@ -69,6 +68,7 @@ impl<'a> Container<'a> {
                     if field.attrs.flatten {
                         has_flatten = true;
                     }
+                    println!("RENAME_RULE: {:?}", &attrs.rename_rule);
                     field.attrs.rename_by_rule(&attrs.rename_rule);
                 }
             }
@@ -147,7 +147,6 @@ fn fields_from_ast<'a>(
                 Some(ident) => syn::Member::Named(ident.clone()),
                 None => syn::Member::Unnamed(i.into()),
             },
-            member_type: field.ty.clone(),
             attrs: attr::Field::from_ast(cx, i, field),
             ty: &field.ty,
             original: field,

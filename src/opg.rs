@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use itertools::*;
 use serde::export::fmt::Display;
@@ -27,44 +27,13 @@ impl OpgContext {
         self.models.insert(prepare_model_reference(name), model)
     }
 
-    pub fn verify_models(&self) -> Result<(), Vec<&str>> {
-        let invalid_links = self
-            .models
-            .iter()
-            .flat_map(|(_, model)| match &model.data {
-                ModelData::Single(single) => Either::Left(std::iter::once(single)),
-                ModelData::OneOf(multiple) => Either::Right(multiple.one_of.iter()),
-            })
-            .filter_map(|type_description| match type_description {
-                ModelTypeDescription::Array(ModelArray { items }) => match items.as_ref() {
-                    ModelReference::Link(link) => {
-                        Some(Either::Left(std::iter::once(link.reference.as_str())))
-                    }
-                    _ => None,
-                },
-                ModelTypeDescription::Object(object) => {
-                    Some(Either::Right(object.properties.iter().filter_map(
-                        |(_, property)| match property {
-                            ModelReference::Link(link) => Some(link.reference.as_str()),
-                            _ => None,
-                        },
-                    )))
-                }
-                _ => None,
-            })
-            .flatten()
-            .fold(Vec::new(), |mut invalid_links, link| {
-                if !self.models.contains_key(link) {
-                    invalid_links.push(link);
-                }
-                invalid_links
-            });
+    pub fn verify_models(&self) -> Result<(), String> {
+        let mut cx = TraverseContext(&self.models);
 
-        if invalid_links.is_empty() {
-            Ok(())
-        } else {
-            Err(invalid_links)
-        }
+        self.models
+            .iter()
+            .try_for_each(|(_, model)| model.traverse(cx))
+            .map_err(|first_occurrence| first_occurrence.to_owned())
     }
 }
 
@@ -99,6 +68,10 @@ impl Model {
         self.data = self.data.apply_params(params);
         self
     }
+
+    fn traverse<'a>(&'a self, mut cx: TraverseContext<'a>) -> Result<(), &'a str> {
+        self.data.traverse(cx)
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -112,8 +85,15 @@ impl ModelData {
     #[inline(always)]
     pub fn apply_params(mut self, params: &ContextParams) -> Self {
         match self {
-            ModelData::Single(data) => Modeldata::Single(data.apply_params(params)),
+            ModelData::Single(data) => ModelData::Single(data.apply_params(params)),
             one_of => one_of, // TODO: apply params to oneOf
+        }
+    }
+
+    fn traverse<'a>(&'a self, mut cx: TraverseContext<'a>) -> Result<(), &'a str> {
+        match self {
+            ModelData::Single(single) => single.traverse(cx),
+            ModelData::OneOf(one_of) => one_of.traverse(cx),
         }
     }
 }
@@ -121,7 +101,13 @@ impl ModelData {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelOneOf {
-    pub one_of: Vec<ModelTypeDescription>,
+    pub one_of: Vec<ModelReference>,
+}
+
+impl ModelOneOf {
+    fn traverse<'a>(&'a self, mut cx: TraverseContext<'a>) -> Result<(), &'a str> {
+        self.one_of.iter().try_for_each(|item| item.traverse(cx))
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -149,6 +135,14 @@ impl ModelTypeDescription {
                 ModelTypeDescription::Integer(integer.apply_params(params))
             }
             other => other,
+        }
+    }
+
+    fn traverse<'a>(&'a self, mut cx: TraverseContext<'a>) -> Result<(), &'a str> {
+        match self {
+            ModelTypeDescription::Array(array) => array.traverse(cx),
+            ModelTypeDescription::Object(object) => object.traverse(cx),
+            _ => Ok(()),
         }
     }
 }
@@ -198,10 +192,24 @@ pub struct ModelArray {
     pub items: Box<ModelReference>,
 }
 
+impl ModelArray {
+    fn traverse<'a>(&'a self, mut cx: TraverseContext<'a>) -> Result<(), &'a str> {
+        self.items.traverse(cx)
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct ModelObject {
     pub properties: BTreeMap<String, ModelReference>,
     pub required: Vec<String>,
+}
+
+impl ModelObject {
+    fn traverse<'a>(&'a self, mut cx: TraverseContext<'a>) -> Result<(), &'a str> {
+        self.properties
+            .iter()
+            .try_for_each(|(_, reference)| reference.traverse(cx))
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -215,6 +223,28 @@ pub struct ModelReferenceLink {
 pub enum ModelReference {
     Link(ModelReferenceLink),
     Inline(Model),
+}
+
+impl ModelReference {
+    fn traverse<'a>(&'a self, mut cx: TraverseContext<'a>) -> Result<(), &'a str> {
+        match &self {
+            ModelReference::Link(ModelReferenceLink { ref reference }) => cx.check(reference),
+            ModelReference::Inline(_) => Ok(()),
+        }
+    }
+}
+
+#[derive(Copy, Clone)]
+struct TraverseContext<'a>(&'a BTreeMap<String, Model>);
+
+impl<'a> TraverseContext<'a> {
+    fn check(&mut self, reference: &'a str) -> Result<(), &'a str> {
+        if self.0.contains_key(reference) {
+            Ok(())
+        } else {
+            Err(reference)
+        }
+    }
 }
 
 trait FromStrangeTuple<T> {
@@ -579,7 +609,7 @@ required:
 
         assert_eq!(
             cx.verify_models(),
-            Err(vec![prepare_model_reference(invalid_link).as_str()])
+            Err(prepare_model_reference(invalid_link))
         );
     }
 }

@@ -9,15 +9,23 @@ use serde::Serialize;
 mod test_compilation {
     use super::*;
 
-    fn test_string() -> String {
-        "AAA".to_owned()
-    }
-
     #[derive(Serialize, OpgModel)]
-    #[opg(with = "test_string")]
     #[serde(rename_all = "camelCase")]
     struct TempTest {
         asd: u32,
+    }
+
+    #[derive(Serialize, OpgModel)]
+    #[serde(rename_all = "camelCase")]
+    #[opg("New type description", string)]
+    struct NewType(String);
+
+    #[derive(Serialize, OpgModel)]
+    #[serde(rename_all = "camelCase")]
+    struct Test {
+        #[opg("Some description", inline)]
+        asd: u32,
+        hello_camel_case: NewType,
     }
 }
 
@@ -27,26 +35,33 @@ mod tests {
 
     #[test]
     fn test_super() {
-        #[derive(Serialize, Opg)]
+        #[derive(Serialize, OpgModel)]
+        #[serde(rename_all = "camelCase")]
+        #[opg("New type description", string)]
+        struct NewType(String);
+
+        #[derive(Serialize, OpgModel)]
+        #[serde(rename_all = "camelCase")]
         struct Test {
+            #[opg("Some description", inline)]
             asd: u32,
+            hello_camel_case: NewType,
         }
 
-        assert_eq!(Test::example(), None);
+        println!(
+            "{}",
+            serde_yaml::to_string(&NewType::get_structure()).unwrap()
+        );
+        println!("{}", serde_yaml::to_string(&Test::get_structure()).unwrap());
     }
 
     #[test]
     fn test_with() {
-        fn create_string() -> String {
-            "Hello World".to_owned()
-        }
-
-        #[derive(Serialize, Opg)]
-        #[opg(with = "create_string")]
+        #[derive(Serialize, OpgModel)]
         struct Test {
             asd: u32,
         }
 
-        assert_eq!(Test::example(), Some("Hello World".to_owned()));
+        println!("{:?}", Test::get_structure());
     }
 }

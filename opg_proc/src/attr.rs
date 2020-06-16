@@ -256,9 +256,7 @@ impl Variant {
     }
 
     pub fn rename_by_rule(&mut self, rule: &RenameRule) {
-        if !self.name.renamed {
-            self.name.name = rule.apply_to_variant(&self.name.name);
-        }
+        self.name.rename_as_variant(rule);
     }
 }
 
@@ -363,9 +361,7 @@ impl Field {
     }
 
     pub fn rename_by_rule(&mut self, rule: &RenameRule) {
-        if !self.name.renamed {
-            self.name.name = rule.apply_to_variant(&self.name.name);
-        }
+        self.name.rename_as_field(rule);
     }
 }
 
@@ -849,11 +845,23 @@ impl Name {
         }
     }
 
+    pub fn rename_as_variant(&mut self, rename_rule: &RenameRule) {
+        if !self.renamed {
+            self.serialized_name = rename_rule.apply_to_variant(&self.source_name);
+        }
+    }
+
+    pub fn rename_as_field(&mut self, rename_rule: &RenameRule) {
+        if !self.renamed {
+            self.serialized_name = rename_rule.apply_to_field(&self.source_name);
+        }
+    }
+
     pub fn raw(&self) -> String {
         self.source_name.clone()
     }
 
-    pub fn serialize(&self) -> String {
-        self.name.clone()
+    pub fn serialized(&self) -> String {
+        self.serialized_name.clone()
     }
 }

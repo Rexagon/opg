@@ -4,9 +4,7 @@ extern crate syn;
 
 mod ast;
 mod attr;
-mod bound;
 mod case;
-mod fragment;
 mod opg;
 mod parsing_context;
 mod symbol;
@@ -16,8 +14,8 @@ use quote::quote;
 
 use self::opg::*;
 
-#[proc_macro_derive(Opg, attributes(opg))]
-pub fn derive_example(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(OpgModel, attributes(opg))]
+pub fn derive_opg_model(input: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(input as syn::DeriveInput);
     impl_derive_example(input)
         .unwrap_or_else(to_compile_errors)
