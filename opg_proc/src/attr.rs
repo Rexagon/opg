@@ -5,7 +5,6 @@ use syn::export::{Formatter, ToTokens};
 use syn::punctuated::Punctuated;
 use syn::Meta::*;
 use syn::NestedMeta::*;
-use syn::Token;
 
 use crate::case::*;
 use crate::parsing_context::*;
@@ -163,6 +162,8 @@ pub struct Variant {
     pub skip_serializing: bool,
 
     pub description: Option<String>,
+    pub format: Option<String>,
+    pub example: Option<String>,
     pub inline: bool,
     pub model_type: Option<ModelType>,
 }
@@ -174,6 +175,8 @@ impl Variant {
         let mut skip_serializing = BoolAttr::none(cx, SKIP_SERIALIZING);
 
         let mut description = Attr::none(cx, DESCRIPTION);
+        let mut format = Attr::none(cx, FORMAT);
+        let mut example = Attr::none(cx, EXAMPLE);
         let mut inline = BoolAttr::none(cx, INLINE);
         let mut model_type = OneOfFlagsAttr::none(cx);
 
@@ -217,6 +220,16 @@ impl Variant {
                         description.set(lit, s.value().clone());
                     }
                 }
+                (AttrFrom::Opg, Meta(NameValue(m))) if &m.path == FORMAT => {
+                    if let Ok(s) = get_lit_str(cx, FORMAT, &m.lit) {
+                        format.set(&m.path, s.value().clone())
+                    }
+                }
+                (AttrFrom::Opg, Meta(NameValue(m))) if &m.path == EXAMPLE => {
+                    if let Ok(s) = get_lit_str(cx, EXAMPLE, &m.lit) {
+                        example.set(&m.path, s.value().clone())
+                    }
+                }
                 (AttrFrom::Opg, Meta(Path(word))) if word == INLINE => inline.set_true(word),
                 (AttrFrom::Opg, Meta(Path(word))) => {
                     if let Ok(t) = ModelType::from_path(word) {
@@ -244,6 +257,8 @@ impl Variant {
             rename_rule: rename_rule.get().unwrap_or(RenameRule::None),
             skip_serializing: skip_serializing.get(),
             description: description.get(),
+            format: format.get(),
+            example: example.get(),
             inline: inline.get(),
             model_type: if let Ok(t) = model_type.at_most_one() {
                 t
@@ -266,6 +281,8 @@ pub struct Field {
 
     pub optional: bool,
     pub description: Option<String>,
+    pub format: Option<String>,
+    pub example: Option<String>,
     pub inline: bool,
     pub model_type: Option<ModelType>,
 }
@@ -278,6 +295,8 @@ impl Field {
         let mut flatten = BoolAttr::none(cx, FLATTEN);
 
         let mut description = Attr::none(cx, DESCRIPTION);
+        let mut format = Attr::none(cx, FORMAT);
+        let mut example = Attr::none(cx, EXAMPLE);
         let mut inline = BoolAttr::none(cx, INLINE);
         let mut model_type = OneOfFlagsAttr::none(cx);
 
@@ -320,6 +339,16 @@ impl Field {
                         description.set(lit, s.value().clone());
                     }
                 }
+                (AttrFrom::Opg, Meta(NameValue(m))) if &m.path == FORMAT => {
+                    if let Ok(s) = get_lit_str(cx, FORMAT, &m.lit) {
+                        format.set(&m.path, s.value().clone())
+                    }
+                }
+                (AttrFrom::Opg, Meta(NameValue(m))) if &m.path == EXAMPLE => {
+                    if let Ok(s) = get_lit_str(cx, EXAMPLE, &m.lit) {
+                        example.set(&m.path, s.value().clone())
+                    }
+                }
                 (AttrFrom::Opg, Meta(Path(word))) if word == INLINE => inline.set_true(word),
                 (AttrFrom::Opg, Meta(Path(word))) => {
                     if let Ok(t) = ModelType::from_path(word) {
@@ -349,6 +378,8 @@ impl Field {
             transparent: false,
             optional: skip_serializing_if.get().is_some(),
             description: description.get(),
+            format: format.get(),
+            example: example.get(),
             inline: inline.get(),
             model_type: if let Ok(t) = model_type.at_most_one() {
                 t
@@ -523,7 +554,7 @@ fn decide_model_type(
 
 fn get_renames<'a>(
     cx: &ParsingContext,
-    items: &'a Punctuated<syn::NestedMeta, Token![,]>,
+    items: &'a Punctuated<syn::NestedMeta, syn::Token![,]>,
 ) -> Result<Option<&'a syn::LitStr>, ()> {
     let ser = get_ser(cx, RENAME, items)?;
     Ok(ser.at_most_one()?)
@@ -532,7 +563,7 @@ fn get_renames<'a>(
 fn get_ser<'c, 'm>(
     cx: &'c ParsingContext,
     attr_name: Symbol,
-    metas: &'m Punctuated<syn::NestedMeta, Token![,]>,
+    metas: &'m Punctuated<syn::NestedMeta, syn::Token![,]>,
 ) -> Result<VecAttr<'c, &'m syn::LitStr>, ()> {
     let mut ser_meta = VecAttr::none(cx, attr_name);
 

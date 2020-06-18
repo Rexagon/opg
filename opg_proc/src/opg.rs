@@ -167,6 +167,8 @@ fn serialize_adjacent_tagged_enum(
                 let type_description = match &variant.style {
                     StructStyle::NewType => newtype_model_reference(
                         &variant.attrs.description,
+                        &variant.attrs.format,
+                        &variant.attrs.example,
                         &variant.fields[0],
                         variant.attrs.inline,
                     ),
@@ -282,11 +284,14 @@ fn serialize_external_tagged_enum(
                     }
                     StructStyle::NewType => newtype_model_reference(
                         &variant.attrs.description,
+                        &variant.attrs.format,
+                        &variant.attrs.example,
                         &variant.fields[0],
                         variant.attrs.inline,
                     ),
                     StructStyle::Tuple => {
-                        tuple_model_reference(&variant.attrs.description, &variant.fields, |_| {
+                        tuple_model_reference(
+                            &variant.attrs.description, &variant.fields, |_| {
                             container.attrs.inline || variant.attrs.inline
                         })
                     }
@@ -540,6 +545,8 @@ fn serialize_newtype_struct(container: &Container, field: &Field) -> proc_macro2
 
 fn newtype_model_reference(
     description: &Option<String>,
+    format: &Option<String>,
+    example: &Option<String>,
     field: &Field,
     inline: bool,
 ) -> proc_macro2::TokenStream {
@@ -547,13 +554,15 @@ fn newtype_model_reference(
         let member_type_name = &field.original.ty;
 
         let description = option_string(description);
+        let format = option_string(format);
+        let example = option_string(example);
 
         quote! {
             opg::ModelReference::Inline(<#member_type_name>::get_structure_with_params(&opg::ContextParams {
                 description: #description,
                 variants: None,
-                format: None,
-                example: None,
+                format: #format,
+                example: #example,
             }))
         }
     } else {
@@ -658,15 +667,15 @@ where
 
             let description = option_string(&field.attrs.description);
             // TODO: add variants attr
-            // TODO: add format attr
-            // TODO: add example attr
+            let format = option_string(&field.attrs.format);
+            let example = option_string(&field.attrs.example);
 
             quote! {
                 opg::ModelReference::Inline(<#member_type_name>::get_structure_with_params(&opg::ContextParams {
                     description: #description,
                     variants: None,
-                    format: None,
-                    example: None,
+                    format: #format,
+                    example: #example,
                 }))
             }
         } else {
