@@ -21,6 +21,24 @@ impl_opg_model!(f64 => number);
 
 impl_opg_model!(bool => boolean);
 
+#[cfg(feature = "uuid")]
+impl OpgModel for uuid::Uuid {
+    fn get_structure() -> Model {
+        Model {
+            description: Some(format!(
+                "UUID ver. 4 [rfc](https://tools.ietf.org/html/rfc4122)"
+            )),
+            data: ModelData::Single(ModelTypeDescription::String(ModelString {
+                variants: None,
+                data: ModelSimple {
+                    format: Some(format!("uuid")),
+                    example: Some(format!("00000000-0000-0000-0000-000000000000")),
+                },
+            })),
+        }
+    }
+}
+
 impl<T> OpgModel for Vec<T>
 where
     T: OpgModel,
