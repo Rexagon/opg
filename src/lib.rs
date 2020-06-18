@@ -3,11 +3,12 @@ mod opg;
 pub use opg::*;
 pub use opg_proc::*;
 
-use serde::Serialize;
-
 #[cfg(test)]
+#[allow(dead_code)]
 mod tests {
     use super::*;
+
+    use serde::Serialize;
 
     #[derive(Serialize, OpgModel)]
     #[serde(rename_all = "camelCase")]

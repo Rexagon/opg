@@ -1,6 +1,5 @@
-use std::collections::{btree_map::Entry, BTreeMap, HashSet};
+use std::collections::{btree_map::Entry, BTreeMap};
 
-use itertools::*;
 use serde::export::fmt::Display;
 use serde::Serialize;
 
@@ -28,7 +27,7 @@ impl OpgContext {
     }
 
     pub fn verify_models(&self) -> Result<(), String> {
-        let mut cx = TraverseContext(&self.models);
+        let cx = TraverseContext(&self.models);
 
         self.models
             .iter()
@@ -70,7 +69,7 @@ impl Model {
         self
     }
 
-    fn traverse<'a>(&'a self, mut cx: TraverseContext<'a>) -> Result<(), &'a str> {
+    fn traverse<'a>(&'a self, cx: TraverseContext<'a>) -> Result<(), &'a str> {
         self.data.traverse(cx)
     }
 
@@ -96,14 +95,14 @@ pub enum ModelData {
 
 impl ModelData {
     #[inline(always)]
-    pub fn apply_params(mut self, params: &ContextParams) -> Self {
+    pub fn apply_params(self, params: &ContextParams) -> Self {
         match self {
             ModelData::Single(data) => ModelData::Single(data.apply_params(params)),
             one_of => one_of, // TODO: apply params to oneOf
         }
     }
 
-    fn traverse<'a>(&'a self, mut cx: TraverseContext<'a>) -> Result<(), &'a str> {
+    fn traverse<'a>(&'a self, cx: TraverseContext<'a>) -> Result<(), &'a str> {
         match self {
             ModelData::Single(single) => single.traverse(cx),
             ModelData::OneOf(one_of) => one_of.traverse(cx),
@@ -118,7 +117,7 @@ pub struct ModelOneOf {
 }
 
 impl ModelOneOf {
-    fn traverse<'a>(&'a self, mut cx: TraverseContext<'a>) -> Result<(), &'a str> {
+    fn traverse<'a>(&'a self, cx: TraverseContext<'a>) -> Result<(), &'a str> {
         self.one_of.iter().try_for_each(|item| item.traverse(cx))
     }
 }
@@ -136,7 +135,7 @@ pub enum ModelTypeDescription {
 
 impl ModelTypeDescription {
     #[inline(always)]
-    pub fn apply_params(mut self, params: &ContextParams) -> Self {
+    pub fn apply_params(self, params: &ContextParams) -> Self {
         match self {
             ModelTypeDescription::String(string) => {
                 ModelTypeDescription::String(string.apply_params(params))
@@ -151,7 +150,7 @@ impl ModelTypeDescription {
         }
     }
 
-    fn traverse<'a>(&'a self, mut cx: TraverseContext<'a>) -> Result<(), &'a str> {
+    fn traverse<'a>(&'a self, cx: TraverseContext<'a>) -> Result<(), &'a str> {
         match self {
             ModelTypeDescription::Array(array) => array.traverse(cx),
             ModelTypeDescription::Object(object) => object.traverse(cx),
@@ -209,7 +208,7 @@ pub struct ModelArray {
 }
 
 impl ModelArray {
-    fn traverse<'a>(&'a self, mut cx: TraverseContext<'a>) -> Result<(), &'a str> {
+    fn traverse<'a>(&'a self, cx: TraverseContext<'a>) -> Result<(), &'a str> {
         self.items.traverse(cx)
     }
 }
@@ -226,7 +225,7 @@ pub struct ModelObject {
 }
 
 impl ModelObject {
-    fn traverse<'a>(&'a self, mut cx: TraverseContext<'a>) -> Result<(), &'a str> {
+    fn traverse<'a>(&'a self, cx: TraverseContext<'a>) -> Result<(), &'a str> {
         self.properties
             .iter()
             .map(|(_, reference)| reference)
@@ -424,6 +423,7 @@ macro_rules! describe_type(
         }
     }) => {{
         let mut properties = BTreeMap::new();
+        #[allow(unused_mut)]
         let mut required = Vec::new();
 
         $(describe_type!(@object_property [properties, required] $property_name$([$required])?: ($($property_tail)*)));*;
@@ -511,8 +511,6 @@ mod tests {
 
     #[test]
     fn test_serialization() {
-        let test = <String as OpgModel>::get_structure();
-
         let model = Model {
             description: Some("Some type".to_owned()),
             data: ModelData::Single(ModelTypeDescription::Object(ModelObject {

@@ -1,6 +1,5 @@
 use itertools::*;
 use syn::punctuated::Punctuated;
-use syn::token::Token;
 use syn::Token;
 
 use crate::attr;
@@ -77,7 +76,7 @@ impl<'a> Container<'a> {
             attrs.has_flatten = true;
         }
 
-        let mut item = Self {
+        let item = Self {
             ident: input.ident.clone(),
             attrs,
             data,
@@ -90,6 +89,7 @@ impl<'a> Container<'a> {
 }
 
 impl<'a> Data<'a> {
+    #[allow(dead_code)]
     pub fn all_fields(&'a self) -> impl Iterator<Item = &'a Field<'a>> {
         match self {
             Data::Enum(variants) => {

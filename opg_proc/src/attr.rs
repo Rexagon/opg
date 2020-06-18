@@ -1,10 +1,8 @@
 use std::str::FromStr;
 
 use proc_macro2::{Group, Span, TokenStream, TokenTree};
-use quote::quote;
 use syn::export::{Formatter, ToTokens};
 use syn::punctuated::Punctuated;
-use syn::token::Token;
 use syn::Meta::*;
 use syn::NestedMeta::*;
 use syn::Token;
@@ -635,8 +633,6 @@ fn get_meta_items(
     cx: &ParsingContext,
     attr: &syn::Attribute,
 ) -> Result<Vec<(AttrFrom, syn::NestedMeta)>, ()> {
-    println!("{:#?}", attr.path.get_ident());
-
     let attr_from = if attr.path == OPG {
         AttrFrom::Opg
     } else if attr.path == SERDE {
@@ -710,12 +706,14 @@ impl<'c, T> Attr<'c, T> {
         }
     }
 
+    #[allow(dead_code)]
     fn set_opt<A: ToTokens>(&mut self, object: A, value: Option<T>) {
         if let Some(value) = value {
             self.set(object, value);
         }
     }
 
+    #[allow(dead_code)]
     fn set_if_none(&mut self, value: T) {
         if self.value.is_none() {
             self.value = Some(value);
@@ -756,6 +754,7 @@ struct OneOfFlagsAttr<'c, T> {
     values: Vec<T>,
 }
 
+#[allow(dead_code)]
 impl<'c, T> OneOfFlagsAttr<'c, T> {
     fn none(cx: &'c ParsingContext) -> Self {
         OneOfFlagsAttr {
@@ -795,6 +794,7 @@ struct VecAttr<'c, T> {
     values: Vec<T>,
 }
 
+#[allow(dead_code)]
 impl<'c, T> VecAttr<'c, T> {
     fn none(cx: &'c ParsingContext, name: Symbol) -> Self {
         VecAttr {
@@ -836,6 +836,7 @@ pub struct Name {
     renamed: bool,
 }
 
+#[allow(dead_code)]
 impl Name {
     fn from_attrs(source_name: String, serialized_name: Attr<String>) -> Self {
         let serialized_name = serialized_name.get();

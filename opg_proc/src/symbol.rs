@@ -1,4 +1,4 @@
-use std::fmt::{self, Display};
+use std::fmt::Display;
 use syn::export::Formatter;
 use syn::{Ident, Path};
 
@@ -14,19 +14,15 @@ define_symbols! {
 
     // named values
     EXAMPLE => "example",
-    EXAMPLE_WITH => "example_with",
     FORMAT => "format",
-    SUMMARY => "summary",
     DESCRIPTION => "description",
 
     // flags
-    ENUM_STRING => "enum_string",
     STRING => "string",
     NUMBER => "number",
     INTEGER => "integer",
     BOOLEAN => "boolean",
     ARRAY => "array",
-    OBJECT => "object",
     ONE_OF => "one_of",
     ANY => "any",
 

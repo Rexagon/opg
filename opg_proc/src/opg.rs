@@ -1,15 +1,10 @@
-use proc_macro2::{Group, Span, TokenStream, TokenTree};
-use quote::{quote, quote_spanned};
+use proc_macro2::Span;
+use quote::quote;
 use syn::export::ToTokens;
-use syn::spanned::Spanned;
-use syn::Meta::*;
-use syn::NestedMeta::*;
 
 use crate::ast::*;
-use crate::attr;
 use crate::attr::{ModelType, TagType};
 use crate::parsing_context::*;
-use crate::symbol::*;
 
 pub fn impl_derive_example(
     input: syn::DeriveInput,
@@ -21,11 +16,7 @@ pub fn impl_derive_example(
     };
     cx.check()?;
 
-    let result = serialize_body(&container);
-
-    println!("{}", result.to_string());
-
-    Ok(result)
+    Ok(serialize_body(&container))
 }
 
 fn serialize_body(container: &Container) -> proc_macro2::TokenStream {
@@ -306,7 +297,6 @@ fn serialize_external_tagged_enum(
                             field.attrs.inline || variant.attrs.inline || container.attrs.inline
                         },
                     ),
-                    _ => unreachable!(),
                 };
 
                 variants.push(variant_name);
