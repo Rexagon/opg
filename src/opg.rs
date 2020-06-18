@@ -1,8 +1,211 @@
 use std::collections::{btree_map::Entry, BTreeMap};
+use std::fmt::Write;
 
-use serde::ser::SerializeMap;
+use serde::ser::{SerializeMap, SerializeSeq};
 use serde::Serialize;
 
+#[derive(Debug, Clone, Serialize)]
+pub struct Opg {
+    pub openapi: String,
+    pub info: OpgInfo,
+
+    #[serde(
+        skip_serializing_if = "BTreeMap::is_empty",
+        serialize_with = "serialize_tags"
+    )]
+    pub tags: BTreeMap<String, OpgTag>,
+
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub servers: Vec<OpgServer>,
+
+    #[serde(
+        skip_serializing_if = "Vec::is_empty",
+        serialize_with = "serialize_ordered_entries"
+    )]
+    pub paths: Vec<(OpgPath, OpgPathValue)>,
+}
+
+fn serialize_ordered_entries<S, T1, T2>(
+    entries: &Vec<(T1, T2)>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    T1: Serialize,
+    T2: Serialize,
+    S: serde::ser::Serializer,
+{
+    let mut ser = serializer.serialize_map(Some(entries.len()))?;
+
+    entries
+        .iter()
+        .try_for_each(|(key, value)| ser.serialize_entry(key, value))?;
+
+    ser.end()
+}
+
+fn serialize_tags<S>(tags: &BTreeMap<String, OpgTag>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::ser::Serializer,
+{
+    #[derive(Serialize)]
+    pub struct OpgTagHelper<'a> {
+        name: &'a str,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        description: &'a Option<String>,
+    }
+
+    let mut ser = serializer.serialize_seq(Some(tags.len()))?;
+
+    tags.iter().try_for_each(|(name, tag)| {
+        ser.serialize_element(&OpgTagHelper {
+            name,
+            description: &tag.description,
+        })
+    })?;
+
+    ser.end()
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct OpgInfo {
+    title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    description: Option<String>,
+    version: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct OpgTag {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    description: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct OpgServer {
+    pub url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct OpgPath(#[serde(serialize_with = "serialize_path_elements")] Vec<OpgPathElement>);
+
+fn serialize_path_elements<S>(
+    elements: &Vec<OpgPathElement>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::ser::Serializer,
+{
+    let mut iter = elements.iter().map(|element| match element {
+        OpgPathElement::Path(path) => itertools::Either::Left(path),
+        OpgPathElement::Parameter(param) => {
+            let param = param[..1].to_ascii_lowercase() + &param[1..];
+            itertools::Either::Right(format!("{{{}}}", param))
+        }
+    });
+
+    let mut result = String::new();
+
+    if let Some(first) = iter.next() {
+        write!(&mut result, "{}", first).unwrap();
+        for element in iter {
+            write!(&mut result, "/{}", element).unwrap();
+        }
+    }
+
+    serializer.serialize_str(&result)
+}
+
+#[derive(Debug, Clone)]
+pub enum OpgPathElement {
+    Path(String),
+    Parameter(String),
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct OpgPathValue {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(
+        flatten,
+        skip_serializing_if = "BTreeMap::is_empty",
+        serialize_with = "serialize_operations"
+    )]
+    operations: BTreeMap<http::Method, OpgOperation>,
+}
+
+fn serialize_operations<S>(
+    operations: &BTreeMap<http::Method, OpgOperation>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::ser::Serializer,
+{
+    let mut ser = serializer.serialize_map(Some(operations.len()))?;
+
+    operations.iter().try_for_each(|(name, operation)| {
+        ser.serialize_entry(&name.as_str().to_ascii_lowercase(), operation)
+    })?;
+
+    ser.end()
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct OpgOperation {
+    pub tags: Vec<String>,
+    pub summary: Option<String>,
+    pub description: Option<String>,
+    #[serde(serialize_with = "serialize_responses")]
+    pub responses: BTreeMap<http::StatusCode, String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub parameters: Vec<OpgOperationParameter>,
+}
+
+fn serialize_responses<S>(
+    responses: &BTreeMap<http::StatusCode, String>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::ser::Serializer,
+{
+    #[derive(Serialize)]
+    pub struct ResponseLink<'a>(
+        #[serde(serialize_with = "serialize_model_reference_link")] &'a str,
+    );
+
+    let mut ser = serializer.serialize_map(Some(responses.len()))?;
+
+    responses
+        .iter()
+        .try_for_each(|(status_code, response_link)| {
+            ser.serialize_entry(&status_code.as_str(), &ResponseLink(response_link))
+        })?;
+
+    ser.end()
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpgOperationParameter {
+    pub name: String,
+    #[serde(rename = "in")]
+    pub parameter_in: OpgOperationParameterIn,
+    pub required: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum OpgOperationParameterIn {
+    Query,
+    Header,
+    Path,
+    Cookie,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct OpgContext {
     models: BTreeMap<String, Model>,
 }
@@ -304,9 +507,22 @@ impl ModelObject {
 #[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum ModelReference {
-    #[serde(serialize_with = "prepare_model_reference")]
+    #[serde(serialize_with = "serialize_model_reference_link")]
     Link(String),
     Inline(Model),
+}
+
+fn serialize_model_reference_link<S, N>(name: &N, serializer: S) -> Result<S::Ok, S::Error>
+where
+    N: std::fmt::Display,
+    S: serde::ser::Serializer,
+{
+    let mut ser = serializer.serialize_map(Some(1))?;
+    ser.serialize_entry(
+        "$ref",
+        &format!("{}{}", crate::SCHEMA_REFERENCE_PREFIX, name),
+    )?;
+    ser.end()
 }
 
 impl ModelReference {
@@ -331,15 +547,20 @@ impl<'a> TraverseContext<'a> {
     }
 }
 
-fn prepare_model_reference<S, N>(name: &N, serializer: S) -> Result<S::Ok, S::Error>
+fn join<T>(sep: &str, iter: T) -> String
 where
-    N: std::fmt::Display,
-    S: serde::ser::Serializer,
+    T: IntoIterator,
+    T::Item: std::fmt::Display,
 {
-    let mut ser = serializer.serialize_map(Some(1))?;
-    ser.serialize_entry(
-        "$ref",
-        &format!("{}{}", crate::SCHEMA_REFERENCE_PREFIX, name),
-    )?;
-    ser.end()
+    let mut out = String::new();
+    let mut iter = iter.into_iter();
+
+    if let Some(first) = iter.next() {
+        write!(&mut out, "{}", first).unwrap();
+        for elt in iter {
+            write!(&mut out, "{}{}", sep, elt).unwrap();
+        }
+    }
+
+    out
 }

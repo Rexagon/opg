@@ -5,6 +5,7 @@ pub use macros::*;
 pub use opg::*;
 pub use opg_proc::*;
 
+pub const OPENAPI_VERSION: &'static str = "3.0.1";
 pub const SCHEMA_REFERENCE_PREFIX: &'static str = "#/components/schemas/";
 
 impl_opg_model!(String => string always_inline);
@@ -117,6 +118,13 @@ mod tests {
         AnotherTest(NewType, NewType),
     }
 
+    #[derive(Serialize, OpgModel)]
+    #[serde(rename_all = "camelCase")]
+    struct TypeChangedStruct {
+        #[opg(integer)]
+        asd: String,
+    }
+
     #[test]
     fn test_super() {
         println!(
@@ -166,6 +174,14 @@ mod tests {
         println!(
             "{}",
             serde_yaml::to_string(&AdjacentlyTaggedEnum::get_structure()).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_type_changed_struct() {
+        println!(
+            "{}",
+            serde_yaml::to_string(&TypeChangedStruct::get_structure()).unwrap()
         );
     }
 
