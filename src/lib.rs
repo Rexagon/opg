@@ -5,30 +5,6 @@ pub use opg_proc::*;
 
 use serde::Serialize;
 
-#[cfg(feature = "test_compilation")]
-mod test_compilation {
-    use super::*;
-
-    #[derive(Serialize, OpgModel)]
-    #[serde(rename_all = "camelCase")]
-    struct TempTest {
-        asd: u32,
-    }
-
-    #[derive(Serialize, OpgModel)]
-    #[serde(rename_all = "camelCase")]
-    #[opg("New type description", string)]
-    struct NewType(String);
-
-    #[derive(Serialize, OpgModel)]
-    #[serde(rename_all = "camelCase")]
-    struct Test {
-        #[opg("Some description", inline)]
-        asd: u32,
-        hello_camel_case: NewType,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -53,6 +29,13 @@ mod tests {
         First,
         Second,
         HelloWorld,
+    }
+
+    #[derive(Serialize, OpgModel)]
+    #[serde(rename_all = "kebab-case")]
+    enum ExternallyTaggedEnum {
+        Test(String),
+        AnotherTest(#[opg(inline)] String, String),
     }
 
     #[derive(Serialize, OpgModel)]
@@ -107,6 +90,14 @@ mod tests {
         println!(
             "{}",
             serde_yaml::to_string(&UntaggedEnumTest::get_structure()).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_externally_enum() {
+        println!(
+            "{}",
+            serde_yaml::to_string(&ExternallyTaggedEnum::get_structure()).unwrap()
         );
     }
 

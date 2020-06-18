@@ -14,8 +14,5 @@ itertools = "0.9"
 [dependencies.opg_proc]
 path = "opg_proc"
 
-[features]
-test_compilation = []
-
 [workspace]
 members = ["opg_proc"]

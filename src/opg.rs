@@ -52,6 +52,7 @@ pub struct ContextParams {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Model {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
@@ -87,7 +88,7 @@ impl Model {
 }
 
 #[derive(Debug, Clone, Serialize)]
-#[serde(untagged)]
+#[serde(untagged, rename_all = "camelCase")]
 pub enum ModelData {
     Single(ModelTypeDescription),
     OneOf(ModelOneOf),
@@ -160,6 +161,7 @@ impl ModelTypeDescription {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ModelString {
     #[serde(rename = "enum", skip_serializing_if = "Option::is_none")]
     pub variants: Option<Vec<String>>,
@@ -179,6 +181,7 @@ impl ModelString {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ModelSimple {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<String>,
@@ -200,6 +203,7 @@ impl ModelSimple {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ModelArray {
     pub items: Box<ModelReference>,
 }
@@ -210,9 +214,14 @@ impl ModelArray {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ModelObject {
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub properties: BTreeMap<String, ModelReference>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub additional_properties: Option<Box<ModelReference>>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub required: Vec<String>,
 }
 
@@ -220,7 +229,9 @@ impl ModelObject {
     fn traverse<'a>(&'a self, mut cx: TraverseContext<'a>) -> Result<(), &'a str> {
         self.properties
             .iter()
-            .try_for_each(|(_, reference)| reference.traverse(cx))
+            .map(|(_, reference)| reference)
+            .chain(self.additional_properties.iter().map(|item| item.as_ref()))
+            .try_for_each(|reference| reference.traverse(cx))
     }
 
     pub fn add_property(
@@ -421,6 +432,7 @@ macro_rules! describe_type(
             description: ($($description.to_string(),)?).extract(),
             data: ModelData::Single(ModelTypeDescription::Object(ModelObject {
                 properties,
+                additional_properties: Default::default(),
                 required,
             }))
         }
@@ -528,6 +540,7 @@ mod tests {
 
                     properties
                 },
+                additional_properties: Default::default(),
                 required: vec![
                     "id".to_owned(),
                     "amount".to_owned(),

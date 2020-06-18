@@ -46,7 +46,7 @@ fn serialize_enum(container: &Container, variants: &Vec<Variant>) -> proc_macro2
         (ModelType::Object, TagType::Adjacent { tag, content }) => {
             serialize_adjacent_tagged_enum(container, variants, tag, content)
         }
-        (ModelType::Dictionary, _) => todo!(),
+        (ModelType::Dictionary, _) => serialize_external_tagged_enum(container, variants),
         (ModelType::OneOf, TagType::None) => serialize_untagged_enum(container, variants),
         (ModelType::OneOf, TagType::Internal { tag }) => {
             serialize_internal_tagged_enum(container, variants, tag)
@@ -236,6 +236,7 @@ fn serialize_adjacent_tagged_enum(
                 opg::ModelObject {
                     properties,
                     required,
+                    ..Default::default()
                 }
             )
         }
@@ -257,7 +258,91 @@ fn serialize_external_tagged_enum(
     container: &Container,
     variants: &Vec<Variant>,
 ) -> proc_macro2::TokenStream {
-    todo!()
+    let type_name = &container.ident;
+
+    let description = option_string(&container.attrs.description);
+
+    let (_, one_of) = variants
+        .iter()
+        .filter(|variant| !variant.attrs.skip_serializing)
+        .fold(
+            (Vec::new(), Vec::new()),
+            |(mut variants, mut one_of), variant| {
+                let variant_name = variant.attrs.name.serialized();
+
+                let type_description = match &variant.style {
+                    StructStyle::Unit => {
+                        let description = option_string(&variant.attrs.description);
+
+                        quote! {
+                            opg::ModelReference::Inline(
+                                opg::Model {
+                                    description: #description,
+                                    data: opg::ModelData::Single(opg::ModelTypeDescription::String(opg::ModelString {
+                                        variants: Some(vec![#variant_name.to_owned()]),
+                                        data: opg::ModelSimple {
+                                            format: None,
+                                            example: #variant_name.to_owned(),
+                                        }
+                                    }))
+                                }
+                            )
+                        }
+                    }
+                    StructStyle::NewType => newtype_model_reference(
+                        &variant.attrs.description,
+                        &variant.fields[0],
+                        variant.attrs.inline,
+                    ),
+                    StructStyle::Tuple => {
+                        tuple_model_reference(&variant.attrs.description, &variant.fields, |_| {
+                            container.attrs.inline || variant.attrs.inline
+                        })
+                    }
+                    StructStyle::Struct => struct_model_reference(
+                        &variant.attrs.description,
+                        &variant.fields,
+                        |field| {
+                            field.attrs.inline || variant.attrs.inline || container.attrs.inline
+                        },
+                    ),
+                    _ => unreachable!(),
+                };
+
+                variants.push(variant_name);
+                one_of.push(type_description);
+                (variants, one_of)
+            },
+        );
+
+    let struct_type_description = quote! {
+        {
+            opg::ModelTypeDescription::Object(
+                opg::ModelObject {
+                    additional_properties: Some(Box::new(opg::ModelReference::Inline(
+                        opg::Model {
+                            description: #description,
+                            data: opg::ModelData::OneOf(opg::ModelOneOf {
+                                one_of: vec![#(#one_of),*],
+                            })
+                        }
+                    ))),
+                    ..Default::default()
+                }
+            )
+        }
+    };
+
+    quote! {
+        impl opg::OpgModel for #type_name {
+            fn get_structure() -> opg::Model {
+                opg::Model {
+                    description: #description,
+                    data: opg::ModelData::Single(#struct_type_description)
+                }
+            }
+        }
+    }
 }
 
 fn serialize_internal_tagged_enum(
@@ -330,6 +415,7 @@ fn serialize_internal_tagged_enum(
                         opg::ModelTypeDescription::Object(opg::ModelObject {
                             properties,
                             required: vec![#tag.to_owned()],
+                            ..Default::default()
                         })
                     };
 
@@ -628,6 +714,7 @@ where
                 opg::ModelObject {
                     properties,
                     required,
+                    ..Default::default()
                 }
             )
         }
