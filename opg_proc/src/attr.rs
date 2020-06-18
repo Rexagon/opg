@@ -294,6 +294,7 @@ impl Field {
         let mut skip_serializing_if = Attr::none(cx, SKIP_SERIALIZING_IF);
         let mut flatten = BoolAttr::none(cx, FLATTEN);
 
+        let mut optional = BoolAttr::none(cx, OPTIONAL);
         let mut description = Attr::none(cx, DESCRIPTION);
         let mut format = Attr::none(cx, FORMAT);
         let mut example = Attr::none(cx, EXAMPLE);
@@ -349,6 +350,7 @@ impl Field {
                         example.set(&m.path, s.value().clone())
                     }
                 }
+                (AttrFrom::Opg, Meta(Path(word))) if word == OPTIONAL => optional.set_true(word),
                 (AttrFrom::Opg, Meta(Path(word))) if word == INLINE => inline.set_true(word),
                 (AttrFrom::Opg, Meta(Path(word))) => {
                     if let Ok(t) = ModelType::from_path(word) {
@@ -376,7 +378,7 @@ impl Field {
             skip_serializing: skip_serializing.get(),
             flatten: flatten.get(),
             transparent: false,
-            optional: skip_serializing_if.get().is_some(),
+            optional: skip_serializing_if.get().is_some() || optional.get(),
             description: description.get(),
             format: format.get(),
             example: example.get(),

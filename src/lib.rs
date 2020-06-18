@@ -5,21 +5,23 @@ pub use macros::*;
 pub use opg::*;
 pub use opg_proc::*;
 
-impl_opg_model!(String => string);
+pub const SCHEMA_REFERENCE_PREFIX: &'static str = "#/components/schemas/";
 
-impl_opg_model!(i8 => integer);
-impl_opg_model!(u8 => integer);
-impl_opg_model!(i16 => integer);
-impl_opg_model!(u16 => integer);
-impl_opg_model!(i32 => integer);
-impl_opg_model!(u32 => integer);
-impl_opg_model!(i64 => integer);
-impl_opg_model!(u64 => integer);
+impl_opg_model!(String => string always_inline);
 
-impl_opg_model!(f32 => number);
-impl_opg_model!(f64 => number);
+impl_opg_model!(i8 => integer always_inline);
+impl_opg_model!(u8 => integer always_inline);
+impl_opg_model!(i16 => integer always_inline);
+impl_opg_model!(u16 => integer always_inline);
+impl_opg_model!(i32 => integer always_inline);
+impl_opg_model!(u32 => integer always_inline);
+impl_opg_model!(i64 => integer always_inline);
+impl_opg_model!(u64 => integer always_inline);
 
-impl_opg_model!(bool => boolean);
+impl_opg_model!(f32 => number always_inline);
+impl_opg_model!(f64 => number always_inline);
+
+impl_opg_model!(bool => boolean always_inline);
 
 #[cfg(feature = "uuid")]
 impl OpgModel for uuid::Uuid {
@@ -61,15 +63,14 @@ mod tests {
     use serde::Serialize;
 
     #[derive(Serialize, OpgModel)]
-    #[serde(rename_all = "camelCase")]
-    #[opg("New type description", string, format = "uuid", example = "000-000")]
+    #[opg("New type description", format = "uuid", example = "000-000")]
     struct NewType(String);
 
     #[derive(Serialize, OpgModel)]
     #[serde(rename_all = "camelCase")]
     struct SimpleStruct {
-        #[opg("Some description", inline)]
         asd: u32,
+        #[opg(optional)]
         hello_camel_case: NewType,
     }
 
@@ -113,7 +114,7 @@ mod tests {
     #[serde(tag = "tag", content = "content", rename_all = "kebab-case")]
     enum AdjacentlyTaggedEnum {
         Test(String),
-        AnotherTest(#[opg(inline)] String, String),
+        AnotherTest(NewType, NewType),
     }
 
     #[test]
@@ -169,16 +170,6 @@ mod tests {
     }
 
     #[test]
-    fn test_with() {
-        #[derive(Serialize, OpgModel)]
-        struct Test {
-            asd: u32,
-        }
-
-        println!("{:?}", Test::get_structure());
-    }
-
-    #[test]
     fn test_serialization() {
         let model = Model {
             description: Some("Some type".to_owned()),
@@ -187,9 +178,7 @@ mod tests {
                     let mut properties = std::collections::BTreeMap::new();
                     properties.insert(
                         "id".to_owned(),
-                        ModelReference::Link(ModelReferenceLink {
-                            reference: "#/components/schemas/TransactionId".to_owned(),
-                        }),
+                        ModelReference::Link("TransactionId".to_owned()),
                     );
                     properties.insert(
                         "amount".to_owned(),
@@ -346,9 +335,6 @@ required:
             }),
         );
 
-        assert_eq!(
-            cx.verify_models(),
-            Err(prepare_model_reference(invalid_link))
-        );
+        assert_eq!(cx.verify_models(), Err(invalid_link.to_owned()));
     }
 }

@@ -1,6 +1,6 @@
 use std::collections::{btree_map::Entry, BTreeMap};
 
-use serde::export::fmt::Display;
+use serde::ser::SerializeMap;
 use serde::Serialize;
 
 pub struct OpgContext {
@@ -21,9 +21,9 @@ impl OpgContext {
 
     pub fn add_model<N>(&mut self, name: N, model: Model) -> Option<Model>
     where
-        N: Display,
+        N: ToString,
     {
-        self.models.insert(prepare_model_reference(name), model)
+        self.models.insert(name.to_string(), model)
     }
 
     pub fn verify_models(&self) -> Result<(), String> {
@@ -38,9 +38,34 @@ impl OpgContext {
 
 pub trait OpgModel {
     fn get_structure() -> Model;
+
     fn get_structure_with_params(params: &ContextParams) -> Model {
         Self::get_structure().apply_params(params)
     }
+
+    #[inline(always)]
+    fn select_reference(inline: bool, inline_params: &ContextParams, link: &str) -> ModelReference {
+        if inline {
+            Self::inject(InjectReference::Inline(inline_params))
+        } else {
+            Self::inject(InjectReference::AsLink(link))
+        }
+    }
+
+    #[inline(always)]
+    fn inject(inject_as: InjectReference) -> ModelReference {
+        match inject_as {
+            InjectReference::Inline(params) => {
+                ModelReference::Inline(Self::get_structure().apply_params(params))
+            }
+            InjectReference::AsLink(link) => ModelReference::Link(link.to_string()),
+        }
+    }
+}
+
+pub enum InjectReference<'a> {
+    Inline(&'a ContextParams),
+    AsLink(&'a str),
 }
 
 pub struct ContextParams {
@@ -277,22 +302,17 @@ impl ModelObject {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct ModelReferenceLink {
-    #[serde(rename = "$ref")]
-    pub reference: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum ModelReference {
-    Link(ModelReferenceLink),
+    #[serde(serialize_with = "prepare_model_reference")]
+    Link(String),
     Inline(Model),
 }
 
 impl ModelReference {
     fn traverse<'a>(&'a self, mut cx: TraverseContext<'a>) -> Result<(), &'a str> {
         match &self {
-            ModelReference::Link(ModelReferenceLink { ref reference }) => cx.check(reference),
+            ModelReference::Link(ref link) => cx.check(link),
             ModelReference::Inline(_) => Ok(()),
         }
     }
@@ -302,20 +322,24 @@ impl ModelReference {
 struct TraverseContext<'a>(&'a BTreeMap<String, Model>);
 
 impl<'a> TraverseContext<'a> {
-    fn check(&mut self, reference: &'a str) -> Result<(), &'a str> {
-        if self.0.contains_key(reference) {
+    fn check(&mut self, link: &'a str) -> Result<(), &'a str> {
+        if self.0.contains_key(link) {
             Ok(())
         } else {
-            Err(reference)
+            Err(link)
         }
     }
 }
 
-pub fn prepare_model_reference<N>(name: N) -> String
+fn prepare_model_reference<S, N>(name: &N, serializer: S) -> Result<S::Ok, S::Error>
 where
-    N: Display,
+    N: std::fmt::Display,
+    S: serde::ser::Serializer,
 {
-    format!("{}{}", SCHEMA_REFERENCE_PREFIX, name)
+    let mut ser = serializer.serialize_map(Some(1))?;
+    ser.serialize_entry(
+        "$ref",
+        &format!("{}{}", crate::SCHEMA_REFERENCE_PREFIX, name),
+    )?;
+    ser.end()
 }
-
-pub const SCHEMA_REFERENCE_PREFIX: &'static str = "#/components/schemas/";

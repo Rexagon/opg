@@ -130,15 +130,11 @@ macro_rules! describe_type(
     };
 
     (@object_property_value link => $ref:literal) => {
-        $crate::ModelReference::Link($crate::ModelReferenceLink {
-            reference: format!("{}{}", SCHEMA_REFERENCE_PREFIX, $ref)
-        })
+        $crate::ModelReference::Link($ref.to_owned())
     };
 
     (@object_property_value link => $ref:ident) => {
-        $crate::ModelReference::Link($crate::ModelReferenceLink {
-            reference: format!("{}{}", SCHEMA_REFERENCE_PREFIX, $ref)
-        })
+        $crate::ModelReference::Link($ref.to_owned())
     };
 
     (@object_property_value $type:ident => $($tail:tt)*) => {
@@ -152,6 +148,18 @@ macro_rules! impl_opg_model(
         impl $crate::OpgModel for $type {
             fn get_structure() -> Model {
                 describe_type!($serialized_type => {})
+            }
+        }
+    };
+
+    ($type:ty => $serialized_type:ident always_inline) => {
+        impl $crate::OpgModel for $type {
+            fn get_structure() -> Model {
+                describe_type!($serialized_type => {})
+            }
+
+            fn select_reference(_: bool, inline_params: &ContextParams, _: &str) -> ModelReference {
+                Self::inject(InjectReference::Inline(inline_params))
             }
         }
     };

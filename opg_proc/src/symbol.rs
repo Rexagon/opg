@@ -27,6 +27,7 @@ define_symbols! {
     ANY => "any",
 
     INLINE => "inline",
+    OPTIONAL => "optional",
 
     // serde
     SERDE => "serde",
