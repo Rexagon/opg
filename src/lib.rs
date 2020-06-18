@@ -68,6 +68,13 @@ mod tests {
         },
     }
 
+    #[derive(Serialize, OpgModel)]
+    #[serde(tag = "tag", content = "content", rename_all = "kebab-case")]
+    enum AdjacentlyTaggedEnum {
+        Test(String),
+        AnotherTest(#[opg(inline)] String, String),
+    }
+
     #[test]
     fn test_super() {
         println!(
@@ -93,6 +100,14 @@ mod tests {
         println!(
             "{}",
             serde_yaml::to_string(&UntaggedEnumTest::get_structure()).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_adjacently_tagged_enum() {
+        println!(
+            "{}",
+            serde_yaml::to_string(&AdjacentlyTaggedEnum::get_structure()).unwrap()
         );
     }
 

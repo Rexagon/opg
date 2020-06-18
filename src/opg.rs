@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{btree_map::Entry, BTreeMap, HashSet};
 
 use itertools::*;
 use serde::export::fmt::Display;
@@ -210,6 +210,51 @@ impl ModelObject {
             .iter()
             .try_for_each(|(_, reference)| reference.traverse(cx))
     }
+
+    pub fn add_property(
+        &mut self,
+        property: String,
+        property_type: ModelReference,
+        is_required: bool,
+    ) -> Result<(), ()> {
+        let entry = match self.properties.entry(property.clone()) {
+            Entry::Vacant(entry) => entry,
+            _ => return Err(()),
+        };
+
+        entry.insert(property_type);
+
+        if is_required {
+            self.required.push(property);
+        }
+
+        Ok(())
+    }
+
+    pub fn merge(&mut self, another: Model) -> Result<(), ()> {
+        let data = match another.data {
+            ModelData::Single(ModelTypeDescription::Object(model_object)) => model_object,
+            _ => return Err(()),
+        };
+
+        data.properties
+            .into_iter()
+            .try_for_each(
+                |(property, property_model)| match self.properties.entry(property) {
+                    Entry::Vacant(entry) => {
+                        entry.insert(property_model);
+                        Ok(())
+                    }
+                    _ => Err(()),
+                },
+            )?;
+
+        data.required
+            .into_iter()
+            .for_each(|property| self.required.push(property));
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -406,14 +451,6 @@ macro_rules! impl_opg_model(
                 describe_type!($serialized_type => {})
             }
         }
-
-        impl OpgModel for Vec<$type> {
-            fn get_structure() -> Model {
-                describe_type!(array => {
-                    items: ($serialized_type => {})
-                })
-            }
-        }
     };
 );
 
@@ -432,6 +469,20 @@ impl_opg_model!(f32 => number);
 impl_opg_model!(f64 => number);
 
 impl_opg_model!(bool => boolean);
+
+impl<T> OpgModel for Vec<T>
+where
+    T: OpgModel,
+{
+    fn get_structure() -> Model {
+        Model {
+            description: None,
+            data: ModelData::Single(ModelTypeDescription::Array(ModelArray {
+                items: Box::new(ModelReference::Inline(T::get_structure())),
+            })),
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
