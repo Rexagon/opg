@@ -69,6 +69,13 @@ mod tests {
     }
 
     #[derive(Serialize, OpgModel)]
+    #[serde(tag = "tag", rename_all = "kebab-case")]
+    enum InternallyTaggedEnum {
+        Test(SimpleStruct),
+        AnotherTest { field: String },
+    }
+
+    #[derive(Serialize, OpgModel)]
     #[serde(tag = "tag", content = "content", rename_all = "kebab-case")]
     enum AdjacentlyTaggedEnum {
         Test(String),
@@ -100,6 +107,14 @@ mod tests {
         println!(
             "{}",
             serde_yaml::to_string(&UntaggedEnumTest::get_structure()).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_internally_tagged_enum() {
+        println!(
+            "{}",
+            serde_yaml::to_string(&InternallyTaggedEnum::get_structure()).unwrap()
         );
     }
 

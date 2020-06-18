@@ -269,7 +269,93 @@ fn serialize_internal_tagged_enum(
 
     let description = option_string(&container.attrs.description);
 
-    todo!()
+    let type_name_stringified = type_name.to_string();
+
+    let one_of = variants
+        .iter()
+        .filter(|variant| !variant.attrs.skip_serializing)
+        .map(|variant| {
+            let variant_name = variant.attrs.name.serialized();
+            let description = option_string(&variant.attrs.description);
+
+            let model = match &variant.style {
+                StructStyle::NewType => {
+                    let member_type_name = &variant.fields[0].original.ty;
+
+                    quote! {
+                        <#member_type_name>::get_structure_with_params(&opg::ContextParams {
+                            description: #description,
+                            variants: None,
+                            format: None,
+                            example: None,
+                        })
+                    }
+                }
+                StructStyle::Struct => {
+                    let object_type_description =
+                        object_type_description(&variant.fields, |field| {
+                            field.attrs.inline || variant.attrs.inline || container.attrs.inline
+                        });
+
+                    quote! {
+                        opg::Model {
+                            description: #description,
+                            data: opg::ModelData::Single(#object_type_description)
+                        }
+                    }
+                }
+                _ => unreachable!(),
+            };
+
+            quote! {
+                {
+                    let mut model = #model;
+
+                    let additional_object = {
+                        let mut properties = std::collections::BTreeMap::new();
+
+                        properties.insert(#tag.to_owned(), opg::ModelReference::Inline(
+                            opg::Model {
+                                description: Some(format!("{} type variant", #type_name_stringified)),
+                                data: opg::ModelData::Single(opg::ModelTypeDescription::String(opg::ModelString {
+                                    variants: Some(vec![#variant_name.to_owned()]),
+                                    data: opg::ModelSimple {
+                                        format: None,
+                                        example: Some(#variant_name.to_owned()),
+                                    }
+                                }))
+                            }
+                        ));
+
+                        opg::ModelTypeDescription::Object(opg::ModelObject {
+                            properties,
+                            required: vec![#tag.to_owned()],
+                        })
+                    };
+
+                    let _ = model.try_merge(opg::Model {
+                        description: None,
+                        data: opg::ModelData::Single(additional_object)
+                    });
+
+                    opg::ModelReference::Inline(model)
+                }
+            }
+        })
+        .collect::<Vec<_>>();
+
+    quote! {
+        impl opg::OpgModel for #type_name {
+            fn get_structure() -> opg::Model {
+                opg::Model {
+                    description: #description,
+                    data: opg::ModelData::OneOf(opg::ModelOneOf {
+                        one_of: vec![#(#one_of),*],
+                    })
+                }
+            }
+        }
+    }
 }
 
 fn serialize_struct(container: &Container, fields: &Vec<Field>) -> proc_macro2::TokenStream {

@@ -72,6 +72,18 @@ impl Model {
     fn traverse<'a>(&'a self, mut cx: TraverseContext<'a>) -> Result<(), &'a str> {
         self.data.traverse(cx)
     }
+
+    pub fn try_merge(&mut self, other: Model) -> Result<(), ()> {
+        match &mut self.data {
+            ModelData::Single(ModelTypeDescription::Object(self_object)) => match other.data {
+                ModelData::Single(ModelTypeDescription::Object(other_object)) => {
+                    self_object.merge(other_object)
+                }
+                _ => Err(()),
+            },
+            _ => Err(()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -231,13 +243,9 @@ impl ModelObject {
         Ok(())
     }
 
-    pub fn merge(&mut self, another: Model) -> Result<(), ()> {
-        let data = match another.data {
-            ModelData::Single(ModelTypeDescription::Object(model_object)) => model_object,
-            _ => return Err(()),
-        };
-
-        data.properties
+    pub fn merge(&mut self, another: ModelObject) -> Result<(), ()> {
+        another
+            .properties
             .into_iter()
             .try_for_each(
                 |(property, property_model)| match self.properties.entry(property) {
@@ -249,7 +257,8 @@ impl ModelObject {
                 },
             )?;
 
-        data.required
+        another
+            .required
             .into_iter()
             .for_each(|property| self.required.push(property));
 
