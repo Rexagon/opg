@@ -112,7 +112,7 @@ dependencies = [
 
 [[package]]
 name = "opg"
-version = "0.1.0"
+version = "0.0.2"
 dependencies = [
  "http",
  "itertools",
@@ -125,9 +125,10 @@ dependencies = [
 
 [[package]]
 name = "opg_derive"
-version = "0.1.0"
+version = "0.0.2"
 dependencies = [
  "itertools",
+ "opg",
  "proc-macro2",
  "quote",
  "syn",
@@ -135,7 +136,7 @@ dependencies = [
 
 [[package]]
 name = "opg_test_suite"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "opg",
  "serde",

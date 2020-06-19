@@ -1,7 +1,13 @@
 [package]
 name = "opg_derive"
-version = "0.1.0"
+description = "Rust OpenAPI 3.0 docs generator"
 authors = ["Ivan Kalinin <i.kalinin@dexpa.io>"]
+license = "Apache-2.0"
+version = "0.0.2"
+repository = "https://github.com/Rexagon/opg"
+keywords = ["openapi", "documentation", "generator"]
+categories = ["encoding"]
+include = ["src/**/*.rs", "README.md", "LICENSE"]
 edition = "2018"
 
 [lib]
@@ -12,3 +18,9 @@ syn = { version = "1.0.11", features = ["full"] }
 quote = "1.0.2"
 proc-macro2 = "1.0.6"
 itertools = "0.9"
+
+[dev-dependencies]
+opg = { version = "0.0", path = "../opg" }
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]

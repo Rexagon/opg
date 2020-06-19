@@ -1,6 +1,6 @@
 [package]
 name = "opg_test_suite"
-version = "0.1.0"
+version = "0.0.0"
 authors = ["Ivan Kalinin <i.kalinin@dexpa.io>"]
 edition = "2018"
 

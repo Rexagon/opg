@@ -1,11 +1,17 @@
 [package]
 name = "opg"
-description = "Rust OpenAPI docs generator"
-version = "0.1.0"
+description = "Rust OpenAPI 3.0 docs generator"
 authors = ["Ivan Kalinin <i.kalinin@dexpa.io>"]
+license = "Apache-2.0"
+version = "0.0.2"
+repository = "https://github.com/Rexagon/opg"
+keywords = ["openapi", "documentation", "generator"]
+categories = ["encoding"]
+include = ["src/**/*.rs", "README.md", "LICENSE"]
 edition = "2018"
 
 [dependencies]
+opg_derive = { version = "=0.0.2", path = "../opg_derive" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.8"
@@ -13,5 +19,8 @@ itertools = "0.9"
 uuid = { version = "0.8", optional = true }
 http = "0.2"
 
-[dependencies.opg_derive]
-path = "../opg_derive"
+[dev-dependencies]
+opg_derive = { version = "0.0", path = "../opg_derive" }
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
