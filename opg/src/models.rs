@@ -546,21 +546,3 @@ impl<'a> TraverseContext<'a> {
         }
     }
 }
-
-fn join<T>(sep: &str, iter: T) -> String
-where
-    T: IntoIterator,
-    T::Item: std::fmt::Display,
-{
-    let mut out = String::new();
-    let mut iter = iter.into_iter();
-
-    if let Some(first) = iter.next() {
-        write!(&mut out, "{}", first).unwrap();
-        for elt in iter {
-            write!(&mut out, "{}{}", sep, elt).unwrap();
-        }
-    }
-
-    out
-}

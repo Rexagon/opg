@@ -1,5 +1,5 @@
 [package]
-name = "opg_proc"
+name = "opg_derive"
 version = "0.1.0"
 authors = ["Ivan Kalinin <i.kalinin@dexpa.io>"]
 edition = "2018"

@@ -1,0 +1,12 @@
+[package]
+name = "opg_test_suite"
+version = "0.1.0"
+authors = ["Ivan Kalinin <i.kalinin@dexpa.io>"]
+edition = "2018"
+
+[dependencies]
+opg = { path = "../opg" }
+
+[dev-dependencies]
+serde = "1.0"
+serde_yaml = "0.8"

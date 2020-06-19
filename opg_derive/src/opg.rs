@@ -3,6 +3,7 @@ use quote::quote;
 
 use crate::ast::*;
 use crate::attr::{ModelType, TagType};
+use crate::dummy;
 use crate::parsing_context::*;
 
 pub fn impl_derive_example(
@@ -15,11 +16,13 @@ pub fn impl_derive_example(
     };
     cx.check()?;
 
+    let ident = &container.ident;
+
     let result = serialize_body(&container);
 
-    // println!("{}", result.to_string());
+    //println!("{}", result.to_string());
 
-    Ok(result)
+    Ok(dummy::wrap_in_const("OPG_MODEL", ident, result))
 }
 
 fn serialize_body(container: &Container) -> proc_macro2::TokenStream {
@@ -64,11 +67,11 @@ fn serialize_newtype_enum(
     let example = option_string(&variants.first().cloned());
 
     let body = quote! {
-        opg::Model {
+        _opg::Model {
             description: #description,
-            data: opg::ModelData::Single(opg::ModelTypeDescription::String(opg::ModelString {
+            data: _opg::ModelData::Single(_opg::ModelTypeDescription::String(_opg::ModelString {
                 variants: Some(vec![#(#variants.to_owned()),*]),
-                data: opg::ModelSimple {
+                data: _opg::ModelSimple {
                     format: None,
                     example: #example,
                 }
@@ -96,9 +99,9 @@ fn serialize_untagged_enum(
                 let description = option_string(&variant.attrs.description);
 
                 quote! {
-                    <#type_name as opg::OpgModel>::select_reference(
+                    <#type_name as _opg::OpgModel>::select_reference(
                         #inline,
-                        &opg::ContextParams {
+                        &_opg::ContextParams {
                             description: #description,
                             variants: None,
                             format: None,
@@ -116,9 +119,9 @@ fn serialize_untagged_enum(
                 });
 
                 quote! {
-                    opg::ModelReference::Inline(opg::Model {
+                    _opg::ModelReference::Inline(_opg::Model {
                         description: #description,
-                        data: opg::ModelData::Single(#object_type_description)
+                        data: _opg::ModelData::Single(#object_type_description)
                     })
                 }
             }
@@ -127,9 +130,9 @@ fn serialize_untagged_enum(
         .collect::<Vec<_>>();
 
     let body = quote! {
-        opg::Model {
+        _opg::Model {
             description: #description,
-            data: opg::ModelData::OneOf(opg::ModelOneOf {
+            data: _opg::ModelData::OneOf(_opg::ModelOneOf {
                 one_of: vec![#(#one_of),*],
             })
         }
@@ -189,12 +192,12 @@ fn serialize_adjacent_tagged_enum(
             let mut properties = std::collections::BTreeMap::new();
             let mut required = Vec::new();
 
-            properties.insert(#tag.to_owned(), opg::ModelReference::Inline(
-                opg::Model {
+            properties.insert(#tag.to_owned(), _opg::ModelReference::Inline(
+                _opg::Model {
                     description: Some(format!("{} type variant", #type_name_stringified)),
-                    data: opg::ModelData::Single(opg::ModelTypeDescription::String(opg::ModelString {
+                    data: _opg::ModelData::Single(_opg::ModelTypeDescription::String(_opg::ModelString {
                         variants: Some(vec![#(#variants.to_owned()),*]),
-                        data: opg::ModelSimple {
+                        data: _opg::ModelSimple {
                             format: None,
                             example: #type_example,
                         }
@@ -203,18 +206,18 @@ fn serialize_adjacent_tagged_enum(
             ));
             required.push(#tag.to_owned());
 
-            properties.insert(#content.to_owned(), opg::ModelReference::Inline(
-                opg::Model {
+            properties.insert(#content.to_owned(), _opg::ModelReference::Inline(
+                _opg::Model {
                     description: #description,
-                    data: opg::ModelData::OneOf(opg::ModelOneOf {
+                    data: _opg::ModelData::OneOf(_opg::ModelOneOf {
                         one_of: vec![#(#one_of),*],
                     })
                 }
             ));
             required.push(#content.to_owned());
 
-            opg::ModelTypeDescription::Object(
-                opg::ModelObject {
+            _opg::ModelTypeDescription::Object(
+                _opg::ModelObject {
                     properties,
                     required,
                     ..Default::default()
@@ -224,9 +227,9 @@ fn serialize_adjacent_tagged_enum(
     };
 
     let body = quote! {
-        opg::Model {
+        _opg::Model {
             description: #description,
-            data: opg::ModelData::Single(#struct_type_description)
+            data: _opg::ModelData::Single(#struct_type_description)
         }
     };
 
@@ -252,12 +255,12 @@ fn serialize_external_tagged_enum(
                         let description = option_string(&variant.attrs.description);
 
                         quote! {
-                            opg::ModelReference::Inline(
-                                opg::Model {
+                            _opg::ModelReference::Inline(
+                                _opg::Model {
                                     description: #description,
-                                    data: opg::ModelData::Single(opg::ModelTypeDescription::String(opg::ModelString {
+                                    data: _opg::ModelData::Single(_opg::ModelTypeDescription::String(_opg::ModelString {
                                         variants: Some(vec![#variant_name.to_owned()]),
-                                        data: opg::ModelSimple {
+                                        data: _opg::ModelSimple {
                                             format: None,
                                             example: #variant_name.to_owned(),
                                         }
@@ -295,14 +298,14 @@ fn serialize_external_tagged_enum(
         );
 
     let body = quote! {
-        opg::Model {
+        _opg::Model {
             description: #description,
-            data: opg::ModelData::Single(opg::ModelTypeDescription::Object(
-                opg::ModelObject {
-                    additional_properties: Some(Box::new(opg::ModelReference::Inline(
-                        opg::Model {
+            data: _opg::ModelData::Single(_opg::ModelTypeDescription::Object(
+                _opg::ModelObject {
+                    additional_properties: Some(Box::new(_opg::ModelReference::Inline(
+                        _opg::Model {
                             description: #description,
-                            data: opg::ModelData::OneOf(opg::ModelOneOf {
+                            data: _opg::ModelData::OneOf(_opg::ModelOneOf {
                                 one_of: vec![#(#one_of),*],
                             })
                         }
@@ -340,7 +343,7 @@ fn serialize_internal_tagged_enum(
                     let example = option_string(&variant.fields[0].attrs.example);
 
                     quote! {
-                        <#type_name as opg::OpgModel>::get_structure_with_params(&opg::ContextParams {
+                        <#type_name as _opg::OpgModel>::get_structure_with_params(&_opg::ContextParams {
                             description: #description,
                             variants: None,
                             format: #format,
@@ -355,9 +358,9 @@ fn serialize_internal_tagged_enum(
                         });
 
                     quote! {
-                        opg::Model {
+                        _opg::Model {
                             description: #description,
-                            data: opg::ModelData::Single(#object_type_description)
+                            data: _opg::ModelData::Single(#object_type_description)
                         }
                     }
                 }
@@ -371,12 +374,12 @@ fn serialize_internal_tagged_enum(
                     let additional_object = {
                         let mut properties = std::collections::BTreeMap::new();
 
-                        properties.insert(#tag.to_owned(), opg::ModelReference::Inline(
-                            opg::Model {
+                        properties.insert(#tag.to_owned(), _opg::ModelReference::Inline(
+                            _opg::Model {
                                 description: Some(format!("{} type variant", #type_name_stringified)),
-                                data: opg::ModelData::Single(opg::ModelTypeDescription::String(opg::ModelString {
+                                data: _opg::ModelData::Single(_opg::ModelTypeDescription::String(_opg::ModelString {
                                     variants: Some(vec![#variant_name.to_owned()]),
-                                    data: opg::ModelSimple {
+                                    data: _opg::ModelSimple {
                                         format: None,
                                         example: Some(#variant_name.to_owned()),
                                     }
@@ -384,28 +387,28 @@ fn serialize_internal_tagged_enum(
                             }
                         ));
 
-                        opg::ModelTypeDescription::Object(opg::ModelObject {
+                        _opg::ModelTypeDescription::Object(_opg::ModelObject {
                             properties,
                             required: vec![#tag.to_owned()],
                             ..Default::default()
                         })
                     };
 
-                    let _ = model.try_merge(opg::Model {
+                    let _ = model.try_merge(_opg::Model {
                         description: None,
-                        data: opg::ModelData::Single(additional_object)
+                        data: _opg::ModelData::Single(additional_object)
                     });
 
-                    opg::ModelReference::Inline(model)
+                    _opg::ModelReference::Inline(model)
                 }
             }
         })
         .collect::<Vec<_>>();
 
     let body = quote! {
-        opg::Model {
+        _opg::Model {
             description: #description,
-            data: opg::ModelData::OneOf(opg::ModelOneOf {
+            data: _opg::ModelData::OneOf(_opg::ModelOneOf {
                 one_of: vec![#(#one_of),*],
             })
         }
@@ -420,9 +423,9 @@ fn serialize_struct(container: &Container, fields: &Vec<Field>) -> proc_macro2::
     let object_type_description = object_type_description(fields, |field| field.attrs.inline);
 
     let body = quote! {
-        opg::Model {
+        _opg::Model {
             description: #description,
-            data: opg::ModelData::Single(#object_type_description)
+            data: _opg::ModelData::Single(#object_type_description)
         }
     };
 
@@ -435,9 +438,9 @@ fn serialize_tuple_struct(container: &Container, fields: &Vec<Field>) -> proc_ma
     let tuple_type_description = tuple_type_description(fields, |field| field.attrs.inline);
 
     let body = quote! {
-        opg::Model {
+        _opg::Model {
             description: #description,
-            data: opg::ModelData::Single(#tuple_type_description)
+            data: _opg::ModelData::Single(#tuple_type_description)
         }
     };
 
@@ -453,38 +456,38 @@ fn serialize_newtype_struct(container: &Container, field: &Field) -> proc_macro2
 
     let data = match container.attrs.model_type {
         ModelType::NewTypeString => quote! {
-            opg::ModelTypeDescription::String(opg::ModelString {
+            _opg::ModelTypeDescription::String(_opg::ModelString {
                 variants: None,
-                data: opg::ModelSimple {
+                data: _opg::ModelSimple {
                     format: #format,
                     example: #example,
                 }
             })
         },
         ModelType::NewTypeInteger => quote! {
-            opg::ModelTypeDescription::Integer(opg::ModelSimple {
+            _opg::ModelTypeDescription::Integer(_opg::ModelSimple {
                 format: #format,
                 example: #example,
             })
         },
         ModelType::NewTypeNumber => quote! {
-            opg::ModelTypeDescription::Number(opg::ModelSimple {
+            _opg::ModelTypeDescription::Number(_opg::ModelSimple {
                 format: #format,
                 example: #example,
             })
         },
         ModelType::NewTypeBoolean => quote! {
-            opg::ModelTypeDescription::Boolean
+            _opg::ModelTypeDescription::Boolean
         },
         ModelType::NewTypeArray if container.attrs.inline => quote! {
-            opg::ModelTypeDescription::Array(opg::ModelArray {
-                items: Box::new(opg::ModelReference::Inline(<#type_name as opg::OpgModel>::get_structure()))
+            _opg::ModelTypeDescription::Array(_opg::ModelArray {
+                items: Box::new(_opg::ModelReference::Inline(<#type_name as _opg::OpgModel>::get_structure()))
             })
         },
         ModelType::NewTypeArray => {
             quote! {
-                opg::ModelTypeDescription::Array(opg::ModelArray {
-                    items: Box::new(opg::ModelReference::Link(opg::ModelReferenceLink {
+                _opg::ModelTypeDescription::Array(_opg::ModelArray {
+                    items: Box::new(_opg::ModelReference::Link(_opg::ModelReferenceLink {
                         reference: stringify!(#type_name).to_owned(),
                     }))
                 })
@@ -494,9 +497,9 @@ fn serialize_newtype_struct(container: &Container, field: &Field) -> proc_macro2
     };
 
     let body = quote! {
-        opg::Model {
+        _opg::Model {
             description: #description,
-            data: opg::ModelData::Single(#data),
+            data: _opg::ModelData::Single(#data),
         }
     };
 
@@ -515,9 +518,9 @@ where
     let tuple_type_description = tuple_type_description(fields, inline_predicate);
 
     quote! {
-        opg::ModelReference::Inline(opg::Model {
+        _opg::ModelReference::Inline(_opg::Model {
             description: #description,
-            data: opg::ModelData::Single(#tuple_type_description)
+            data: _opg::ModelData::Single(#tuple_type_description)
         })
     }
 }
@@ -534,9 +537,9 @@ where
     let object_type_description = object_type_description(fields, inline_predicate);
 
     quote! {
-        opg::ModelReference::Inline(opg::Model {
+        _opg::ModelReference::Inline(_opg::Model {
             description: #description,
-            data: opg::ModelData::Single(#object_type_description)
+            data: _opg::ModelData::Single(#object_type_description)
         })
     }
 }
@@ -551,18 +554,18 @@ where
         .collect::<Vec<_>>();
 
     let one_of = quote! {
-        opg::Model {
+        _opg::Model {
             description: None,
-            data: opg::ModelData::OneOf(opg::ModelOneOf {
+            data: _opg::ModelData::OneOf(_opg::ModelOneOf {
                 one_of: vec![#(#data),*],
             })
         }
     };
 
     quote! {
-        opg::ModelTypeDescription::Array(
-            opg::ModelArray {
-                items: Box::new(opg::ModelReference::Inline(#one_of)),
+        _opg::ModelTypeDescription::Array(
+            _opg::ModelArray {
+                items: Box::new(_opg::ModelReference::Inline(#one_of)),
             }
         )
     }
@@ -606,8 +609,8 @@ where
 
             #(#data)*
 
-            opg::ModelTypeDescription::Object(
-                opg::ModelObject {
+            _opg::ModelTypeDescription::Object(
+                _opg::ModelObject {
                     properties,
                     required,
                     ..Default::default()
@@ -631,9 +634,9 @@ fn field_model_reference(
     let example = option_string(example);
 
     quote! {
-        <#type_name as opg::OpgModel>::select_reference(
+        <#type_name as _opg::OpgModel>::select_reference(
             #inline,
-            &opg::ContextParams {
+            &_opg::ContextParams {
                 description: #description,
                 variants: None,
                 format: #format,
@@ -671,8 +674,8 @@ fn implement_type(
     };
 
     quote! {
-        impl opg::OpgModel for #type_name {
-            fn get_structure() -> opg::Model {
+        impl _opg::OpgModel for #type_name {
+            fn get_structure() -> _opg::Model {
                 #body
             }
 

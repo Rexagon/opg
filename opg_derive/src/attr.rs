@@ -7,6 +7,7 @@ use syn::Meta::*;
 use syn::NestedMeta::*;
 
 use crate::case::*;
+use crate::dummy::*;
 use crate::parsing_context::*;
 use crate::symbol::*;
 
@@ -689,10 +690,6 @@ fn get_meta_items(
             Err(())
         }
     }
-}
-
-fn unraw(ident: &syn::Ident) -> String {
-    ident.to_string().trim_start_matches("r#").to_owned()
 }
 
 #[derive(Copy, Clone)]

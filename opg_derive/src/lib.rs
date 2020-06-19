@@ -5,6 +5,7 @@ extern crate syn;
 mod ast;
 mod attr;
 mod case;
+mod dummy;
 mod opg;
 mod parsing_context;
 mod symbol;
