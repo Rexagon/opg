@@ -3,7 +3,7 @@ use std::fmt::Write;
 use std::sync::Arc;
 
 use serde::ser::{SerializeMap, SerializeSeq};
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct Opg {
@@ -105,18 +105,13 @@ fn serialize_path_elements<S>(
 where
     S: serde::ser::Serializer,
 {
-    let mut iter = elements.iter().map(|element| match element {
-        OpgPathElement::Path(path) => itertools::Either::Left(path),
-        OpgPathElement::Parameter(param) => itertools::Either::Right(format!("{{{}}}", param)),
-    });
-
     let mut result = String::new();
 
-    if let Some(first) = iter.next() {
-        write!(&mut result, "{}", first).unwrap();
-        for element in iter {
-            write!(&mut result, "/{}", element).unwrap();
-        }
+    for element in elements.iter().map(|element| match element {
+        OpgPathElement::Path(path) => itertools::Either::Left(path),
+        OpgPathElement::Parameter(param) => itertools::Either::Right(format!("{{{}}}", param)),
+    }) {
+        write!(&mut result, "/{}", element).unwrap();
     }
 
     serializer.serialize_str(&result)
@@ -182,7 +177,8 @@ where
     ser.end()
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct OpgOperation {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
@@ -190,8 +186,9 @@ pub struct OpgOperation {
     pub summary: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
-    #[serde(serialize_with = "serialize_responses")]
-    pub responses: BTreeMap<u16, String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub request_body: Option<OpgRequestBody>,
+    pub responses: BTreeMap<u16, OpgResponse>,
     #[serde(
         skip_serializing_if = "BTreeMap::is_empty",
         serialize_with = "serialize_parameters"
@@ -199,25 +196,81 @@ pub struct OpgOperation {
     pub parameters: BTreeMap<String, OpgOperationParameter>,
 }
 
-fn serialize_responses<S>(
-    responses: &BTreeMap<u16, String>,
-    serializer: S,
-) -> Result<S::Ok, S::Error>
-where
-    S: serde::ser::Serializer,
-{
-    #[derive(Serialize)]
-    struct ResponseLink<'a>(#[serde(serialize_with = "serialize_model_reference_link")] &'a str);
+#[derive(Debug, Clone)]
+pub struct OpgRequestBody {
+    description: Option<String>,
+    required: bool,
+    schema: ModelReference,
+}
 
-    let mut ser = serializer.serialize_map(Some(responses.len()))?;
+impl Serialize for OpgRequestBody {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+    where
+        S: Serializer,
+    {
+        #[derive(Serialize)]
+        struct OpgRequestBodyHelper<'a> {
+            #[serde(skip_serializing_if = "is_false")]
+            required: bool,
+            description: &'a Option<String>,
+            content: ResponseContent<'a>,
+        }
 
-    responses
-        .iter()
-        .try_for_each(|(status_code, response_link)| {
-            ser.serialize_entry(&status_code.to_string(), &ResponseLink(response_link))
-        })?;
+        OpgRequestBodyHelper {
+            required: self.required,
+            description: &self.description,
+            content: ResponseContent {
+                media_type: ResponseMediaType {
+                    schema: &self.schema,
+                },
+            },
+        }
+        .serialize(serializer)
+    }
+}
 
-    ser.end()
+#[derive(Debug, Clone)]
+pub struct OpgResponse {
+    description: String,
+    schema: ModelReference,
+}
+
+impl Serialize for OpgResponse {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+    where
+        S: Serializer,
+    {
+        #[derive(Serialize)]
+        struct OpgResponseHelper<'a> {
+            description: &'a str,
+            content: ResponseContent<'a>,
+        }
+
+        OpgResponseHelper {
+            description: &self.description,
+            content: ResponseContent {
+                media_type: ResponseMediaType {
+                    schema: &self.schema,
+                },
+            },
+        }
+        .serialize(serializer)
+    }
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
+#[derive(Serialize)]
+struct ResponseMediaType<'a> {
+    schema: &'a ModelReference,
+}
+
+#[derive(Serialize)]
+struct ResponseContent<'a> {
+    #[serde(rename = "application/json")]
+    media_type: ResponseMediaType<'a>,
 }
 
 fn serialize_parameters<S>(
@@ -235,6 +288,7 @@ where
         description: &'a Option<String>,
         #[serde(rename = "in")]
         parameter_in: OpgOperationParameterIn,
+        #[serde(skip_serializing_if = "is_false")]
         required: bool,
         #[serde(skip_serializing_if = "Option::is_none")]
         schema: &'a Option<ModelReference>,
@@ -623,6 +677,7 @@ macro_rules! describe_api {
         }
     };
 
+
     (@opg_property info $($property:ident: $property_value:literal),*$(,)?) => {{
         $(let $property = describe_api!(@opg_info_property $property $property_value));*;
         $crate::models::OpgInfo {
@@ -633,6 +688,7 @@ macro_rules! describe_api {
     (@opg_info_property title $value:literal) => { $value.to_owned() };
     (@opg_info_property version $value:literal) => { $value.to_owned() };
     (@opg_info_property description $value:literal) => { Some($value.to_owned()) };
+
 
     (@opg_property tags $($tag:ident$(($description:literal))?),*$(,)?) => {{
         let mut tags = std::collections::BTreeMap::new();
@@ -650,6 +706,7 @@ macro_rules! describe_api {
         }));*;
         servers
     }};
+
 
     (@opg_property paths $(($first_path_segment:tt$( / $path_segment:tt)*): {
         $($properties:tt)*
@@ -672,13 +729,75 @@ macro_rules! describe_api {
         $context.$field = Some($value.to_owned());
         describe_api!(@opg_path_value_properties $context $($other)*)
     };
-    (@opg_path_value_properties $context:ident $(,)? responses: { $($responses:tt)* }) => {
-        describe_api!(@opg_path_value_responses $context $($responses)*)
-    }
-    (@opg_path_value_properties $context:ident $(,)? parameters: { $($parameters:tt)* }) => {
-        describe_api!(@opg_path_value_parameters $context $($parameters)*)
+    (@opg_path_value_properties $context:ident $(,)? parameters: { $($parameters:tt)* } $($other:tt)*) => {
+        describe_api!(@opg_path_value_parameters $context $($parameters)*);
+        describe_api!(@opg_path_value_properties $context $($other)*)
+    };
+    (@opg_path_value_properties $context:ident $(,)? $method:ident: { $($properties:tt)* } $($other:tt)*) => {
+        let mut operation = $crate::models::OpgOperation::default();
+        describe_api!(@opg_path_value_operation_properties operation $($properties)*);
+        $context.operations.insert($crate::models::OpgHttpMethod::$method, operation);
+
+        describe_api!(@opg_path_value_properties $context $($other)*)
     };
     (@opg_path_value_properties $context:ident $(,)?) => {};
+
+
+    (@opg_path_value_operation_properties $context:ident $(,)? $field:ident: $value:literal $($other:tt)*) => {
+        $context.$field = Some($value.to_owned());
+        describe_api!(@opg_path_value_operation_properties $context $($other)*)
+    };
+    (@opg_path_value_operation_properties $context:ident $(,)? tags: {$($tag:ident),*$(,)?} $($other:tt)*) => {
+        $($context.tags.push(stringify!($tag).to_owned()));*;
+        describe_api!(@opg_path_value_operation_properties $context $($other)*)
+    };
+    (@opg_path_value_operation_properties $context:ident $(,)? parameters: { $($parameters:tt)* } $($other:tt)*) => {
+        describe_api!(@opg_path_value_parameters $context $($parameters)*);
+        describe_api!(@opg_path_value_operation_properties $context $($other)*)
+    };
+    (@opg_path_value_operation_properties $context:ident $(,)? body: { $($body:tt)* } $($other:tt)*) => {
+        let mut description = None;
+        let mut required = true;
+        let schema = std::marker::PhantomData::<()>; // just as stub
+        describe_api!(@opg_path_value_body_properties description required schema $($body)*);
+        $context.request_body = Some($crate::models::OpgRequestBody {
+           description,
+           required,
+           schema, // schema must be specified
+        });
+        describe_api!(@opg_path_value_operation_properties $context $($other)*)
+    };
+    (@opg_path_value_operation_properties $context:ident $(,)? $response:literal: $type:tt ($description:literal) $($other:tt)*) => {
+        $context.responses.insert($response, $crate::models::OpgResponse {
+            description: $description.to_owned(),
+            schema: <$type as $crate::models::OpgModel>::select_reference(
+                false,
+                &Default::default(),
+                stringify!($type)
+            )
+        });
+        describe_api!(@opg_path_value_operation_properties $context $($other)*)
+    };
+    (@opg_path_value_operation_properties $context:ident $(,)?) => {};
+
+
+    (@opg_path_value_body_properties $description:ident $required:ident $schema:ident $(,)? schema: $type:tt $($other:tt)*) => {
+        let $schema = <$type as $crate::models::OpgModel>::select_reference(
+            false,
+            &Default::default(),
+            stringify!($type)
+        );
+        describe_api!(@opg_path_value_body_properties $description $required $schema $($other)*)
+    };
+    (@opg_path_value_body_properties $description:ident $required:ident $schema:ident $(,)? description: $value:literal $($other:tt)*) => {
+        $description = Some($value.to_owned());
+        describe_api!(@opg_path_value_body_properties $description $required $schema $($other)*)
+    };
+    (@opg_path_value_body_properties $description:ident $required:ident $schema:ident $(,)? required: $value:literal $($other:tt)*) => {
+        $required = $value;
+        describe_api!(@opg_path_value_body_properties $description $required $schema $($other)*)
+    };
+    (@opg_path_value_body_properties $description:ident $required:ident $schema:ident $(,)?) => {};
 
 
     (@opg_path_value_parameters $context:ident (header $name:literal): { $($properties:tt)* } $($other:tt)*) => {{
@@ -686,10 +805,24 @@ macro_rules! describe_api {
             description: None,
             parameter_in: $crate::models::OpgOperationParameterIn::Header,
             required: false,
-            schema: None,
+            schema: Some(String::select_reference(false, &Default::default(), "String")),
         };
         describe_api!(@opg_path_value_parameter_properties parameter $($properties)*);
         $context.parameters.insert($name.to_owned(), parameter);
+    }};
+    (@opg_path_value_parameters $context:ident (query $name:ident: $type:ty): { $($properties:tt)* } $($other:tt)*) => {{
+        let mut parameter = $crate::models::OpgOperationParameter {
+            description: None,
+            parameter_in: $crate::models::OpgOperationParameterIn::Header,
+            required: false,
+            schema: Some(<$type as $crate::models::OpgModel>::select_reference(
+                false,
+                &Default::default(),
+                stringify!($type)
+            ))
+        };
+        describe_api!(@opg_path_value_parameter_properties parameter $($properties)*);
+        $context.parameters.insert(stringify!($name).to_owned(), parameter);
     }};
     (@opg_path_value_parameter_properties $context:ident $(,)? description: $value:literal $($other:tt)*) => {
         $context.description = Some($value.to_owned());
@@ -770,12 +903,27 @@ mod tests {
                         (header "x-request-id"): {
                             description: "Test",
                             required: true,
-                            schema: String,
                         }
-                    }
-                    get: {
-
-                        200: SimpleResponse,
+                    },
+                    GET: {
+                        tags: {internal},
+                        summary: "Small summary",
+                        description: "Small description",
+                        parameters: {
+                            (query someParam: u32): {
+                                description: "Test",
+                            }
+                        }
+                        200: String ("Ok"),
+                    },
+                    POST: {
+                        tags: {admin},
+                        body: {
+                            description: "Some interesting description",
+                            schema: String,
+                            required: true,
+                        }
+                        200: u32 ("Ok")
                     }
                 }
             }
