@@ -1,6 +1,5 @@
 use std::collections::{btree_map::Entry, BTreeMap};
 use std::fmt::Write;
-use std::sync::Arc;
 
 use serde::ser::{SerializeMap, SerializeSeq};
 use serde::{Serialize, Serializer};
@@ -19,9 +18,13 @@ pub struct Opg {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub servers: Vec<OpgServer>,
 
-    //skip_serializing_if = "Vec::is_empty",
-    #[serde(serialize_with = "serialize_ordered_entries")]
+    #[serde(
+        serialize_with = "serialize_ordered_entries",
+        skip_serializing_if = "Vec::is_empty"
+    )]
     pub paths: Vec<(OpgPath, OpgPathValue)>,
+
+    pub components: OpgComponents,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -76,16 +79,16 @@ where
 
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct OpgInfo {
-    title: String,
+    pub title: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    description: Option<String>,
-    version: String,
+    pub description: Option<String>,
+    pub version: String,
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct OpgTag {
     #[serde(skip_serializing_if = "Option::is_none")]
-    description: Option<String>,
+    pub description: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -96,7 +99,7 @@ pub struct OpgServer {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct OpgPath(#[serde(serialize_with = "serialize_path_elements")] Vec<OpgPathElement>);
+pub struct OpgPath(#[serde(serialize_with = "serialize_path_elements")] pub Vec<OpgPathElement>);
 
 fn serialize_path_elements<S>(
     elements: &Vec<OpgPathElement>,
@@ -134,12 +137,12 @@ pub struct OpgPathValue {
         skip_serializing_if = "BTreeMap::is_empty",
         serialize_with = "serialize_operations"
     )]
-    operations: BTreeMap<OpgHttpMethod, OpgOperation>,
+    pub operations: BTreeMap<OpgHttpMethod, OpgOperation>,
     #[serde(
         skip_serializing_if = "BTreeMap::is_empty",
         serialize_with = "serialize_parameters"
     )]
-    parameters: BTreeMap<String, OpgOperationParameter>,
+    pub parameters: BTreeMap<String, OpgOperationParameter>,
 }
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
@@ -198,9 +201,9 @@ pub struct OpgOperation {
 
 #[derive(Debug, Clone)]
 pub struct OpgRequestBody {
-    description: Option<String>,
-    required: bool,
-    schema: ModelReference,
+    pub description: Option<String>,
+    pub required: bool,
+    pub schema: ModelReference,
 }
 
 impl Serialize for OpgRequestBody {
@@ -231,8 +234,8 @@ impl Serialize for OpgRequestBody {
 
 #[derive(Debug, Clone)]
 pub struct OpgResponse {
-    description: String,
-    schema: ModelReference,
+    pub description: String,
+    pub schema: ModelReference,
 }
 
 impl Serialize for OpgResponse {
@@ -326,34 +329,51 @@ pub enum OpgOperationParameterIn {
     Cookie,
 }
 
-#[derive(Debug, Clone, Serialize)]
-pub struct OpgContext {
-    models: BTreeMap<String, Model>,
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct OpgComponents {
+    schemas: BTreeMap<String, Model>,
 }
 
-impl OpgContext {
+impl OpgComponents {
     pub fn new() -> Self {
         Self {
-            models: BTreeMap::new(),
+            schemas: BTreeMap::new(),
         }
     }
 
     #[inline(always)]
     pub fn contains_model(&self, name: &str) -> bool {
-        self.models.contains_key(name)
+        self.schemas.contains_key(name)
     }
 
-    pub fn add_model<N>(&mut self, name: N, model: Model) -> Option<Model>
+    pub fn add_model<N>(&mut self, name: N, model: Model)
     where
         N: ToString,
     {
-        self.models.insert(name.to_string(), model)
+        if let std::collections::btree_map::Entry::Vacant(entry) =
+            self.schemas.entry(name.to_string())
+        {
+            entry.insert(model);
+        }
     }
 
-    pub fn verify_models(&self) -> Result<(), String> {
-        let cx = TraverseContext(&self.models);
+    #[allow(dead_code)]
+    pub fn mention<M>(&mut self, model_name: &str) -> ModelReference
+    where
+        M: OpgModel,
+    {
+        let reference = M::select_reference(false, &Default::default(), model_name);
+        if let ModelReference::Link(_) = &reference {
+            self.add_model(model_name, M::get_structure())
+        }
+        reference
+    }
 
-        self.models
+    #[allow(dead_code)]
+    pub fn verify_schemas(&self) -> Result<(), String> {
+        let cx = TraverseContext(&self.schemas);
+
+        self.schemas
             .iter()
             .try_for_each(|(_, model)| model.traverse(cx))
             .map_err(|first_occurrence| first_occurrence.to_owned())
@@ -666,269 +686,5 @@ impl<'a> TraverseContext<'a> {
         } else {
             Err(link)
         }
-    }
-}
-
-macro_rules! describe_api {
-    ($($property:ident: {$($property_value:tt)+}),*$(,)?) => {
-        $crate::models::Opg {
-            $($property: { describe_api!(@opg_property $property $($property_value)*) },)*
-            ..Default::default()
-        }
-    };
-
-
-    (@opg_property info $($property:ident: $property_value:literal),*$(,)?) => {{
-        $(let $property = describe_api!(@opg_info_property $property $property_value));*;
-        $crate::models::OpgInfo {
-            $($property,)*
-            ..Default::default()
-        }
-    }};
-    (@opg_info_property title $value:literal) => { $value.to_owned() };
-    (@opg_info_property version $value:literal) => { $value.to_owned() };
-    (@opg_info_property description $value:literal) => { Some($value.to_owned()) };
-
-
-    (@opg_property tags $($tag:ident$(($description:literal))?),*$(,)?) => {{
-        let mut tags = std::collections::BTreeMap::new();
-        $(tags.insert(stringify!($tag).to_owned(), $crate::models::OpgTag {
-            description: $crate::macros::FromStrangeTuple::extract(($($description.to_string(),)?)),
-        }));*;
-        tags
-    }};
-
-    (@opg_property servers $($url:literal$(($description:literal))?),*$(,)?) => {{
-        let mut servers = Vec::new();
-        $(servers.push($crate::models::OpgServer {
-            url: $url.to_owned(),
-            description: $crate::macros::FromStrangeTuple::extract(($($description.to_string(),)?)),
-        }));*;
-        servers
-    }};
-
-
-    (@opg_property paths $(($first_path_segment:tt$( / $path_segment:tt)*): {
-        $($properties:tt)*
-    }),*$(,)?) => {{
-        let mut result = Vec::new();
-        $({
-            let mut path = Vec::new();
-            let mut context = $crate::models::OpgPathValue::default();
-
-            describe_api!(@opg_path_url path context $first_path_segment $($path_segment)*);
-            describe_api!(@opg_path_value_properties context $($properties)*);
-
-            result.push(($crate::models::OpgPath(path), context));
-        };)*
-        result
-    }};
-
-
-    (@opg_path_value_properties $context:ident $(,)? $field:ident: $value:literal $($other:tt)*) => {
-        $context.$field = Some($value.to_owned());
-        describe_api!(@opg_path_value_properties $context $($other)*)
-    };
-    (@opg_path_value_properties $context:ident $(,)? parameters: { $($parameters:tt)* } $($other:tt)*) => {
-        describe_api!(@opg_path_value_parameters $context $($parameters)*);
-        describe_api!(@opg_path_value_properties $context $($other)*)
-    };
-    (@opg_path_value_properties $context:ident $(,)? $method:ident: { $($properties:tt)* } $($other:tt)*) => {
-        let mut operation = $crate::models::OpgOperation::default();
-        describe_api!(@opg_path_value_operation_properties operation $($properties)*);
-        $context.operations.insert($crate::models::OpgHttpMethod::$method, operation);
-
-        describe_api!(@opg_path_value_properties $context $($other)*)
-    };
-    (@opg_path_value_properties $context:ident $(,)?) => {};
-
-
-    (@opg_path_value_operation_properties $context:ident $(,)? $field:ident: $value:literal $($other:tt)*) => {
-        $context.$field = Some($value.to_owned());
-        describe_api!(@opg_path_value_operation_properties $context $($other)*)
-    };
-    (@opg_path_value_operation_properties $context:ident $(,)? tags: {$($tag:ident),*$(,)?} $($other:tt)*) => {
-        $($context.tags.push(stringify!($tag).to_owned()));*;
-        describe_api!(@opg_path_value_operation_properties $context $($other)*)
-    };
-    (@opg_path_value_operation_properties $context:ident $(,)? parameters: { $($parameters:tt)* } $($other:tt)*) => {
-        describe_api!(@opg_path_value_parameters $context $($parameters)*);
-        describe_api!(@opg_path_value_operation_properties $context $($other)*)
-    };
-    (@opg_path_value_operation_properties $context:ident $(,)? body: { $($body:tt)* } $($other:tt)*) => {
-        let mut description = None;
-        let mut required = true;
-        let schema = std::marker::PhantomData::<()>; // just as stub
-        describe_api!(@opg_path_value_body_properties description required schema $($body)*);
-        $context.request_body = Some($crate::models::OpgRequestBody {
-           description,
-           required,
-           schema, // schema must be specified
-        });
-        describe_api!(@opg_path_value_operation_properties $context $($other)*)
-    };
-    (@opg_path_value_operation_properties $context:ident $(,)? $response:literal: $type:tt ($description:literal) $($other:tt)*) => {
-        $context.responses.insert($response, $crate::models::OpgResponse {
-            description: $description.to_owned(),
-            schema: <$type as $crate::models::OpgModel>::select_reference(
-                false,
-                &Default::default(),
-                stringify!($type)
-            )
-        });
-        describe_api!(@opg_path_value_operation_properties $context $($other)*)
-    };
-    (@opg_path_value_operation_properties $context:ident $(,)?) => {};
-
-
-    (@opg_path_value_body_properties $description:ident $required:ident $schema:ident $(,)? schema: $type:tt $($other:tt)*) => {
-        let $schema = <$type as $crate::models::OpgModel>::select_reference(
-            false,
-            &Default::default(),
-            stringify!($type)
-        );
-        describe_api!(@opg_path_value_body_properties $description $required $schema $($other)*)
-    };
-    (@opg_path_value_body_properties $description:ident $required:ident $schema:ident $(,)? description: $value:literal $($other:tt)*) => {
-        $description = Some($value.to_owned());
-        describe_api!(@opg_path_value_body_properties $description $required $schema $($other)*)
-    };
-    (@opg_path_value_body_properties $description:ident $required:ident $schema:ident $(,)? required: $value:literal $($other:tt)*) => {
-        $required = $value;
-        describe_api!(@opg_path_value_body_properties $description $required $schema $($other)*)
-    };
-    (@opg_path_value_body_properties $description:ident $required:ident $schema:ident $(,)?) => {};
-
-
-    (@opg_path_value_parameters $context:ident (header $name:literal): { $($properties:tt)* } $($other:tt)*) => {{
-        let mut parameter = $crate::models::OpgOperationParameter {
-            description: None,
-            parameter_in: $crate::models::OpgOperationParameterIn::Header,
-            required: false,
-            schema: Some(String::select_reference(false, &Default::default(), "String")),
-        };
-        describe_api!(@opg_path_value_parameter_properties parameter $($properties)*);
-        $context.parameters.insert($name.to_owned(), parameter);
-    }};
-    (@opg_path_value_parameters $context:ident (query $name:ident: $type:ty): { $($properties:tt)* } $($other:tt)*) => {{
-        let mut parameter = $crate::models::OpgOperationParameter {
-            description: None,
-            parameter_in: $crate::models::OpgOperationParameterIn::Header,
-            required: false,
-            schema: Some(<$type as $crate::models::OpgModel>::select_reference(
-                false,
-                &Default::default(),
-                stringify!($type)
-            ))
-        };
-        describe_api!(@opg_path_value_parameter_properties parameter $($properties)*);
-        $context.parameters.insert(stringify!($name).to_owned(), parameter);
-    }};
-    (@opg_path_value_parameter_properties $context:ident $(,)? description: $value:literal $($other:tt)*) => {
-        $context.description = Some($value.to_owned());
-        describe_api!(@opg_path_value_parameter_properties $context $($other)*)
-    };
-    (@opg_path_value_parameter_properties $context:ident $(,)? required: $value:literal $($other:tt)*) => {
-        $context.required = $value;
-        describe_api!(@opg_path_value_parameter_properties $context $($other)*)
-    };
-    (@opg_path_value_parameter_properties $context:ident $(,)? schema: $type:tt $($other:tt)*) => {
-        $context.schema = Some(<$type as $crate::models::OpgModel>::select_reference(
-            false,
-            &Default::default(),
-            stringify!($parameter)
-        ));
-        describe_api!(@opg_path_value_parameter_properties $context $($other)*)
-    };
-    (@opg_path_value_parameter_properties $context:ident $(,)?) => {};
-
-
-    (@opg_path_url $path:ident $context:ident $current:tt $($other:tt)*) => {
-        $path.push(describe_api!(@opg_path_url_element $context $current));
-        describe_api!(@opg_path_url $path $context $($other)*)
-    };
-    (@opg_path_url $path:ident $context:ident) => {};
-
-    (@opg_path_url_element $context:ident $segment:literal) => {
-        $crate::models::OpgPathElement::Path($segment.to_owned())
-    };
-    (@opg_path_url_element $context:ident $parameter:ty) => {{
-        let name = {
-            let name = stringify!($parameter);
-            string[..1].to_ascii_lowercase() + &string[1..]
-        };
-        describe_api!(@opg_path_insert_url_param $context name $parameter)
-    }};
-    (@opg_path_url_element $context:ident {$name:ident: $parameter:ty}) => {{
-        let name = stringify!($name).to_owned();
-        describe_api!(@opg_path_insert_url_param $context name $parameter)
-    }};
-    (@opg_path_insert_url_param $context:ident $name:ident $parameter:ty) => {{
-        $context.parameters.insert($name.clone(), $crate::models::OpgOperationParameter {
-            description: None,
-            parameter_in: $crate::models::OpgOperationParameterIn::Path,
-            required: true,
-            schema: Some(
-                <$parameter as $crate::models::OpgModel>::select_reference(
-                    false,
-                    &Default::default(),
-                    stringify!($parameter)
-                )
-            )
-        });
-        $crate::models::OpgPathElement::Parameter($name)
-    }}
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn expands_normally() {
-        let test = describe_api! {
-            info: {
-                title: "My super API",
-                version: "0.0.0",
-            },
-            tags: {internal, admin("Super admin methods")},
-            servers: {
-                "https://my.super.server.com/v1",
-            },
-            paths: {
-                ("hello" / "world" / { paramTest: String }): {
-                    summary: "Some test group of requests",
-                    description: "Another test description",
-                    parameters: {
-                        (header "x-request-id"): {
-                            description: "Test",
-                            required: true,
-                        }
-                    },
-                    GET: {
-                        tags: {internal},
-                        summary: "Small summary",
-                        description: "Small description",
-                        parameters: {
-                            (query someParam: u32): {
-                                description: "Test",
-                            }
-                        }
-                        200: String ("Ok"),
-                    },
-                    POST: {
-                        tags: {admin},
-                        body: {
-                            description: "Some interesting description",
-                            schema: String,
-                            required: true,
-                        }
-                        200: u32 ("Ok")
-                    }
-                }
-            }
-        };
-
-        println!("{}", serde_yaml::to_string(&test).unwrap());
     }
 }

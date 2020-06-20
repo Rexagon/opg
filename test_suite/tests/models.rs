@@ -251,7 +251,7 @@ required:
 
 #[test]
 fn test_valid_models_context() {
-    let mut cx = OpgContext::new();
+    let mut cx = OpgComponents::new();
 
     cx.add_model(
         "TransactionId",
@@ -271,12 +271,12 @@ fn test_valid_models_context() {
         }),
     );
 
-    assert_eq!(cx.verify_models(), Ok(()));
+    assert_eq!(cx.verify_schemas(), Ok(()));
 }
 
 #[test]
 fn test_invalid_models_context() {
-    let mut cx = OpgContext::new();
+    let mut cx = OpgComponents::new();
 
     let invalid_link = "TransactionId";
 
@@ -289,5 +289,5 @@ fn test_invalid_models_context() {
         }),
     );
 
-    assert_eq!(cx.verify_models(), Err(invalid_link.to_owned()));
+    assert_eq!(cx.verify_schemas(), Err(invalid_link.to_owned()));
 }
