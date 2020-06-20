@@ -17,7 +17,6 @@ serde_json = "1"
 serde_yaml = "0.8"
 itertools = "0.9"
 uuid = { version = "0.8", optional = true }
-http = "0.2"
 
 [dev-dependencies]
 opg_derive = { version = "0.0", path = "../opg_derive" }

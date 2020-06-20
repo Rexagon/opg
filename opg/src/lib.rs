@@ -5,7 +5,7 @@ pub use macros::*;
 pub use models::*;
 pub use opg_derive::*;
 
-pub const OPENAPI_VERSION: &'static str = "3.0.1";
+pub const OPENAPI_VERSION: &'static str = "3.0.3";
 pub const SCHEMA_REFERENCE_PREFIX: &'static str = "#/components/schemas/";
 
 impl_opg_model!(String => string always_inline);
