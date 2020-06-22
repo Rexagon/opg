@@ -22,6 +22,7 @@ pub struct Container {
     pub format: Option<String>,
     pub example: Option<String>,
     pub inline: bool,
+    pub explicit_model_type: Option<ModelType>,
     pub model_type: ModelType,
 }
 
@@ -140,7 +141,8 @@ impl Container {
         }
 
         let tag_type = decide_tag(untagged, internal_tag, content);
-        let model_type = decide_model_type(cx, input, &tag_type, model_type);
+        let explicit_model_type = model_type.at_most_one();
+        let model_type = decide_model_type(cx, input, &tag_type, explicit_model_type);
 
         Self {
             name: Name::from_attrs(unraw(&input.ident), ser_name),
@@ -152,6 +154,7 @@ impl Container {
             format: format.get(),
             example: example.get(),
             inline: inline.get(),
+            explicit_model_type,
             model_type,
         }
     }
@@ -166,7 +169,7 @@ pub struct Variant {
     pub format: Option<String>,
     pub example: Option<String>,
     pub inline: bool,
-    pub model_type: Option<ModelType>,
+    pub explicit_model_type: Option<ModelType>,
 }
 
 impl Variant {
@@ -261,11 +264,7 @@ impl Variant {
             format: format.get(),
             example: example.get(),
             inline: inline.get(),
-            model_type: if let Ok(t) = model_type.at_most_one() {
-                t
-            } else {
-                None
-            },
+            explicit_model_type: model_type.at_most_one(),
         }
     }
 
@@ -285,7 +284,7 @@ pub struct Field {
     pub format: Option<String>,
     pub example: Option<String>,
     pub inline: bool,
-    pub model_type: Option<ModelType>,
+    pub explicit_model_type: Option<ModelType>,
 }
 
 impl Field {
@@ -384,11 +383,7 @@ impl Field {
             format: format.get(),
             example: example.get(),
             inline: inline.get(),
-            model_type: if let Ok(t) = model_type.at_most_one() {
-                t
-            } else {
-                None
-            },
+            explicit_model_type: model_type.at_most_one(),
         }
     }
 
@@ -411,7 +406,7 @@ pub enum ModelType {
 }
 
 impl ModelType {
-    fn is_newtype(&self) -> bool {
+    pub fn is_newtype(&self) -> bool {
         match self {
             ModelType::NewTypeString
             | ModelType::NewTypeInteger
@@ -469,14 +464,8 @@ fn decide_model_type(
     cx: &ParsingContext,
     input: &syn::DeriveInput,
     tag_type: &TagType,
-    model_type: OneOfFlagsAttr<ModelType>,
+    model_type: Option<ModelType>,
 ) -> ModelType {
-    let model_type = if let Ok(t) = model_type.at_most_one() {
-        t
-    } else {
-        None
-    };
-
     match (&input.data, model_type) {
         (syn::Data::Enum(_), None) => match tag_type {
             TagType::None | TagType::Internal { .. } => ModelType::OneOf,
@@ -801,15 +790,14 @@ impl<'c, T> OneOfFlagsAttr<'c, T> {
         self.values.push(value)
     }
 
-    fn at_most_one(mut self) -> Result<Option<T>, ()> {
+    fn at_most_one(mut self) -> Option<T> {
         if self.values.len() > 1 {
             let dup_token = self.first_dup_tokens;
             self.cx
                 .error_spanned_by(dup_token, "duplicate opg attribute");
-            Err(())
-        } else {
-            Ok(self.values.pop())
         }
+
+        self.values.pop()
     }
 
     fn get(self) -> Vec<T> {

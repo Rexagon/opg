@@ -40,6 +40,11 @@ impl OpgModel for uuid::Uuid {
             })),
         }
     }
+
+    #[inline(always)]
+    fn select_reference(_: bool, inline_params: &ContextParams, _: &str) -> ModelReference {
+        Self::inject(InjectReference::Inline(inline_params))
+    }
 }
 
 impl<T> OpgModel for Vec<T>

@@ -454,52 +454,17 @@ fn serialize_newtype_struct(container: &Container, field: &Field) -> proc_macro2
 
     let type_name = &field.original.ty;
 
-    let data = match container.attrs.model_type {
-        ModelType::NewTypeString => quote! {
-            _opg::ModelTypeDescription::String(_opg::ModelString {
-                variants: None,
-                data: _opg::ModelSimple {
+    let body = match container.attrs.explicit_model_type {
+        Some(model_type) => newtype_model(description, format, example, model_type),
+        None => {
+            quote! {
+                <#type_name as _opg::OpgModel>::get_structure_with_params(&_opg::ContextParams {
+                    description: #description,
+                    variants: None,
                     format: #format,
                     example: #example,
-                }
-            })
-        },
-        ModelType::NewTypeInteger => quote! {
-            _opg::ModelTypeDescription::Integer(_opg::ModelSimple {
-                format: #format,
-                example: #example,
-            })
-        },
-        ModelType::NewTypeNumber => quote! {
-            _opg::ModelTypeDescription::Number(_opg::ModelSimple {
-                format: #format,
-                example: #example,
-            })
-        },
-        ModelType::NewTypeBoolean => quote! {
-            _opg::ModelTypeDescription::Boolean
-        },
-        ModelType::NewTypeArray if container.attrs.inline => quote! {
-            _opg::ModelTypeDescription::Array(_opg::ModelArray {
-                items: Box::new(_opg::ModelReference::Inline(<#type_name as _opg::OpgModel>::get_structure()))
-            })
-        },
-        ModelType::NewTypeArray => {
-            quote! {
-                _opg::ModelTypeDescription::Array(_opg::ModelArray {
-                    items: Box::new(_opg::ModelReference::Link(_opg::ModelReferenceLink {
-                        reference: stringify!(#type_name).to_owned(),
-                    }))
                 })
             }
-        }
-        _ => unreachable!(),
-    };
-
-    let body = quote! {
-        _opg::Model {
-            description: #description,
-            data: _opg::ModelData::Single(#data),
         }
     };
 
@@ -633,17 +598,71 @@ fn field_model_reference(
     let format = option_string(format);
     let example = option_string(example);
 
-    quote! {
-        <#type_name as _opg::OpgModel>::select_reference(
-            #inline,
-            &_opg::ContextParams {
-                description: #description,
+    match field.attrs.explicit_model_type {
+        Some(model_type) if model_type.is_newtype() => {
+            let model = newtype_model(description, format, example, model_type);
+
+            quote! {
+                _opg::ModelReference::Inline(#model)
+            }
+        }
+        _ => {
+            quote! {
+                <#type_name as _opg::OpgModel>::select_reference(
+                    #inline,
+                    &_opg::ContextParams {
+                        description: #description,
+                        variants: None,
+                        format: #format,
+                        example: #example,
+                    },
+                    stringify!(#type_name),
+                )
+            }
+        }
+    }
+}
+
+fn newtype_model(
+    description: proc_macro2::TokenStream,
+    format: proc_macro2::TokenStream,
+    example: proc_macro2::TokenStream,
+    model_type: ModelType,
+) -> proc_macro2::TokenStream {
+    let data = match model_type {
+        ModelType::NewTypeString => quote! {
+            _opg::ModelTypeDescription::String(_opg::ModelString {
                 variants: None,
+                data: _opg::ModelSimple {
+                    format: #format,
+                    example: #example,
+                }
+            })
+        },
+        ModelType::NewTypeInteger => quote! {
+            _opg::ModelTypeDescription::Integer(_opg::ModelSimple {
                 format: #format,
                 example: #example,
-            },
-            stringify!(#type_name),
-        )
+            })
+        },
+        ModelType::NewTypeNumber => quote! {
+            _opg::ModelTypeDescription::Number(_opg::ModelSimple {
+                format: #format,
+                example: #example,
+            })
+        },
+        ModelType::NewTypeBoolean => quote! {
+            _opg::ModelTypeDescription::Boolean
+        },
+        ModelType::NewTypeArray => todo!(),
+        _ => unreachable!(),
+    };
+
+    quote! {
+        _opg::Model {
+            description: #description,
+            data: _opg::ModelData::Single(#data),
+        }
     }
 }
 

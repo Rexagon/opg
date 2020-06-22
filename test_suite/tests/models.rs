@@ -6,6 +6,10 @@ use serde::Serialize;
 struct NewType(String);
 
 #[derive(Serialize, OpgModel)]
+#[opg("Override description")]
+struct NewNewType(NewType);
+
+#[derive(Serialize, OpgModel)]
 #[serde(rename_all = "camelCase")]
 struct SimpleStruct {
     asd: u32,
@@ -59,16 +63,24 @@ enum AdjacentlyTaggedEnum {
 #[derive(Serialize, OpgModel)]
 #[serde(rename_all = "camelCase")]
 struct TypeChangedStruct {
-    #[opg(integer)]
+    #[opg(string)]
     asd: String,
 }
 
 #[test]
-fn test_super() {
+fn test_newtype() {
     println!(
         "{}",
         serde_yaml::to_string(&NewType::get_structure()).unwrap()
     );
+    println!(
+        "{}",
+        serde_yaml::to_string(&NewNewType::get_structure()).unwrap()
+    );
+}
+
+#[test]
+fn test_simple_struct() {
     println!(
         "{}",
         serde_yaml::to_string(&SimpleStruct::get_structure()).unwrap()
