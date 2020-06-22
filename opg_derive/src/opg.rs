@@ -665,7 +665,7 @@ fn implement_type(
     let inline = if inline {
         quote! {
             #[inline(always)]
-            fn select_reference(_: bool, inline_params: &ContextParams, _: &str) -> ModelReference {
+            fn select_reference(_: bool, inline_params: &_opg::ContextParams, _: &str) -> _opg::ModelReference {
                 Self::inject(_opg::InjectReference::Inline(inline_params))
             }
         }
