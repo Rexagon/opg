@@ -666,7 +666,7 @@ fn implement_type(
         quote! {
             #[inline(always)]
             fn select_reference(_: bool, inline_params: &ContextParams, _: &str) -> ModelReference {
-                Self::inject(InjectReference::Inline(inline_params))
+                Self::inject(_opg::InjectReference::Inline(inline_params))
             }
         }
     } else {
