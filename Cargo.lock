@@ -22,12 +22,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "itoa"
-version = "0.4.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc6f3ad7b9d11a0c00842ff8de1b60ee58661048eb8049ed33c73594f359d7e6"
-
-[[package]]
 name = "linked-hash-map"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -35,19 +29,17 @@ checksum = "8dd5a6d5999d9907cda8ed67bbd137d3af8085216c2ac62de5be860bd41f304a"
 
 [[package]]
 name = "opg"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "itertools",
  "opg_derive",
  "serde",
- "serde_json",
- "serde_yaml",
  "uuid",
 ]
 
 [[package]]
 name = "opg_derive"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "itertools",
  "opg",
@@ -84,12 +76,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ryu"
-version = "1.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71d301d4193d031abdd79ff7e3dd721168a9572ef3fe51a1517aba235bd8f86e"
-
-[[package]]
 name = "serde"
 version = "1.0.113"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -107,17 +93,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "serde_json"
-version = "1.0.55"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec2c5d7e739bc07a3e73381a39d61fdb5f671c60c1df26a130690665803d8226"
-dependencies = [
- "itoa",
- "ryu",
- "serde",
 ]
 
 [[package]]
