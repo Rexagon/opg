@@ -358,13 +358,13 @@ impl OpgComponents {
     }
 
     #[allow(dead_code)]
-    pub fn mention<M>(&mut self, model_name: &str) -> ModelReference
+    pub fn mention<M>(&mut self) -> ModelReference
     where
         M: OpgModel,
     {
-        let reference = M::select_reference(false, &Default::default(), model_name);
-        if let ModelReference::Link(_) = &reference {
-            self.add_model(model_name, M::get_structure())
+        let reference = M::select_reference(false, &Default::default());
+        if let ModelReference::Link(link) = &reference {
+            self.add_model(link, M::get_structure())
         }
         reference
     }
@@ -383,16 +383,20 @@ impl OpgComponents {
 pub trait OpgModel {
     fn get_structure() -> Model;
 
+    #[inline(always)]
+    fn get_type_name() -> Option<&'static str> {
+        None
+    }
+
     fn get_structure_with_params(params: &ContextParams) -> Model {
         Self::get_structure().apply_params(params)
     }
 
     #[inline(always)]
-    fn select_reference(inline: bool, inline_params: &ContextParams, link: &str) -> ModelReference {
-        if inline {
-            Self::inject(InjectReference::Inline(inline_params))
-        } else {
-            Self::inject(InjectReference::AsLink(link))
+    fn select_reference(inline: bool, inline_params: &ContextParams) -> ModelReference {
+        match Self::get_type_name() {
+            Some(link) if !inline => Self::inject(InjectReference::AsLink(link)),
+            _ => Self::inject(InjectReference::Inline(inline_params)),
         }
     }
 

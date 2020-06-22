@@ -107,7 +107,6 @@ fn serialize_untagged_enum(
                             format: None,
                             example: None,
                         },
-                        stringify!(#type_name),
                     )
                 }
             }
@@ -616,7 +615,6 @@ fn field_model_reference(
                         format: #format,
                         example: #example,
                     },
-                    stringify!(#type_name),
                 )
             }
         }
@@ -684,12 +682,17 @@ fn implement_type(
     let inline = if inline {
         quote! {
             #[inline(always)]
-            fn select_reference(_: bool, inline_params: &_opg::ContextParams, _: &str) -> _opg::ModelReference {
+            fn select_reference(_: bool, inline_params: &_opg::ContextParams) -> _opg::ModelReference {
                 Self::inject(_opg::InjectReference::Inline(inline_params))
             }
         }
     } else {
-        quote! {}
+        quote! {
+            #[inline(always)]
+            fn get_type_name() -> Option<&'static str> {
+                Some(stringify!(#type_name))
+            }
+        }
     };
 
     quote! {

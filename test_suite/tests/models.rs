@@ -136,6 +136,14 @@ fn test_type_changed_struct() {
 }
 
 #[test]
+fn test_tuples() {
+    println!(
+        "{}",
+        serde_yaml::to_string(&<(String, u64)>::get_structure()).unwrap()
+    );
+}
+
+#[test]
 fn test_serialization() {
     let model = Model {
         description: Some("Some type".to_owned()),

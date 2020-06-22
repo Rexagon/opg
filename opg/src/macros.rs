@@ -158,8 +158,33 @@ macro_rules! impl_opg_model(
                 describe_type!($serialized_type => {})
             }
 
-            fn select_reference(_: bool, inline_params: &ContextParams, _: &str) -> ModelReference {
+            fn select_reference(_: bool, inline_params: &ContextParams) -> ModelReference {
                 Self::inject(InjectReference::Inline(inline_params))
+            }
+        }
+    };
+
+    (generic_tuple ($($type:ident),+)) => {
+        impl<$($type),+> $crate::OpgModel for ($($type),+)
+        where
+            $($type : $crate::OpgModel),*
+        {
+            fn get_structure() -> Model {
+                let item_model = $crate::Model {
+                    description: None,
+                    data: $crate::ModelData::OneOf($crate::ModelOneOf {
+                        one_of: vec![
+                            $(<$type as $crate::OpgModel>::select_reference(
+                                false,
+                                &Default::default(),
+                            )),*
+                        ],
+                    }),
+                };
+
+                describe_type!(array => {
+                    items: (raw_model => item_model)
+                })
             }
         }
     };
@@ -269,7 +294,7 @@ macro_rules! describe_api {
     (@opg_path_value_operation_properties $components:ident $context:ident $(,)? $response:literal: $type:tt ($description:literal) $($other:tt)*) => {
         $context.responses.insert($response, $crate::models::OpgResponse {
             description: $description.to_owned(),
-            schema: $components.mention::<$type>(stringify!($type))
+            schema: $components.mention::<$type>()
         });
         describe_api!(@opg_path_value_operation_properties $components $context $($other)*)
     };
@@ -277,7 +302,7 @@ macro_rules! describe_api {
 
 
     (@opg_path_value_body_properties $components:ident $description:ident $required:ident $schema:ident $(,)? schema: $type:tt $($other:tt)*) => {
-        let $schema = $components.mention::<$type>(stringify!($type));
+        let $schema = $components.mention::<$type>();
         describe_api!(@opg_path_value_body_properties $components $description $required $schema $($other)*)
     };
     (@opg_path_value_body_properties $components:ident $description:ident $required:ident $schema:ident $(,)? description: $value:literal $($other:tt)*) => {
@@ -296,7 +321,7 @@ macro_rules! describe_api {
             description: None,
             parameter_in: $crate::models::OpgOperationParameterIn::Header,
             required: false,
-            schema: Some(String::select_reference(false, &Default::default(), "String")),
+            schema: Some(String::select_reference(false, &Default::default())),
         };
         describe_api!(@opg_path_value_parameter_properties $components parameter $($properties)*);
         $context.parameters.insert($name.to_owned(), parameter);
@@ -309,7 +334,6 @@ macro_rules! describe_api {
             schema: Some(<$type as $crate::models::OpgModel>::select_reference(
                 false,
                 &Default::default(),
-                stringify!($type)
             ))
         };
         describe_api!(@opg_path_value_parameter_properties $components parameter $($properties)*);
@@ -326,7 +350,7 @@ macro_rules! describe_api {
         describe_api!(@opg_path_value_parameter_properties $components $context $($other)*)
     };
     (@opg_path_value_parameter_properties $components:ident $context:ident $(,)? schema: $type:tt $($other:tt)*) => {
-        $context.schema = Some($components.mention::<$type>($stringify!($type)));
+        $context.schema = Some($components.mention::<$type>());
         describe_api!(@opg_path_value_parameter_properties $components $context $($other)*)
     };
     (@opg_path_value_parameter_properties $components:ident $context:ident $(,)?) => {};
@@ -361,7 +385,6 @@ macro_rules! describe_api {
                 <$parameter as $crate::models::OpgModel>::select_reference(
                     false,
                     &Default::default(),
-                    stringify!($parameter)
                 )
             )
         });
