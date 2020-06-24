@@ -22,8 +22,6 @@ define_symbols! {
     NUMBER => "number",
     INTEGER => "integer",
     BOOLEAN => "boolean",
-    ARRAY => "array",
-    ONE_OF => "one_of",
     ANY => "any",
 
     INLINE => "inline",

@@ -30,8 +30,8 @@ pub enum RenameRule {
 
 impl RenameRule {
     /// Apply a renaming rule to an enum variant, returning the version expected in the source.
-    pub fn apply_to_variant(&self, variant: &str) -> String {
-        match *self {
+    pub fn apply_to_variant(self, variant: &str) -> String {
+        match self {
             None | PascalCase => variant.to_owned(),
             LowerCase => variant.to_ascii_lowercase(),
             UPPERCASE => variant.to_ascii_uppercase(),
@@ -55,8 +55,8 @@ impl RenameRule {
     }
 
     /// Apply a renaming rule to a struct field, returning the version expected in the source.
-    pub fn apply_to_field(&self, field: &str) -> String {
-        match *self {
+    pub fn apply_to_field(self, field: &str) -> String {
+        match self {
             None | LowerCase | SnakeCase => field.to_owned(),
             UPPERCASE => field.to_ascii_uppercase(),
             PascalCase => {

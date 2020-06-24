@@ -1,6 +1,5 @@
 use itertools::*;
 use syn::punctuated::Punctuated;
-use syn::Token;
 
 use crate::attr;
 use crate::parsing_context::*;
@@ -53,12 +52,12 @@ impl<'a> Container<'a> {
         match &mut data {
             Data::Enum(variants) => {
                 for variant in variants {
-                    variant.attrs.rename_by_rule(&attrs.rename_rule);
+                    variant.attrs.rename_by_rule(attrs.rename_rule);
                     for field in &mut variant.fields {
                         if field.attrs.flatten {
                             has_flatten = true;
                         }
-                        field.attrs.rename_by_rule(&attrs.rename_rule);
+                        field.attrs.rename_by_rule(attrs.rename_rule);
                     }
                 }
             }
@@ -67,7 +66,7 @@ impl<'a> Container<'a> {
                     if field.attrs.flatten {
                         has_flatten = true;
                     }
-                    field.attrs.rename_by_rule(&attrs.rename_rule);
+                    field.attrs.rename_by_rule(attrs.rename_rule);
                 }
             }
         }
@@ -102,7 +101,7 @@ impl<'a> Data<'a> {
 
 fn enum_from_ast<'a>(
     cx: &ParsingContext,
-    variants: &'a Punctuated<syn::Variant, Token![,]>,
+    variants: &'a Punctuated<syn::Variant, syn::Token![,]>,
 ) -> Vec<Variant<'a>> {
     variants
         .iter()
@@ -136,7 +135,7 @@ fn struct_from_ast<'a>(
 
 fn fields_from_ast<'a>(
     cx: &ParsingContext,
-    fields: &'a Punctuated<syn::Field, Token![,]>,
+    fields: &'a Punctuated<syn::Field, syn::Token![,]>,
 ) -> Vec<Field<'a>> {
     fields
         .iter()

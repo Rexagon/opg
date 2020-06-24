@@ -37,7 +37,7 @@ impl Default for OpgOpenApi {
 }
 
 fn serialize_ordered_entries<S, T1, T2>(
-    entries: &Vec<(T1, T2)>,
+    entries: &[(T1, T2)],
     serializer: S,
 ) -> Result<S::Ok, S::Error>
 where
@@ -101,10 +101,7 @@ pub struct OpgServer {
 #[derive(Debug, Clone, Serialize)]
 pub struct OpgPath(#[serde(serialize_with = "serialize_path_elements")] pub Vec<OpgPathElement>);
 
-fn serialize_path_elements<S>(
-    elements: &Vec<OpgPathElement>,
-    serializer: S,
-) -> Result<S::Ok, S::Error>
+fn serialize_path_elements<S>(elements: &[OpgPathElement], serializer: S) -> Result<S::Ok, S::Error>
 where
     S: serde::ser::Serializer,
 {
@@ -261,6 +258,8 @@ impl Serialize for OpgResponse {
     }
 }
 
+// helper for serde
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn is_false(value: &bool) -> bool {
     !*value
 }

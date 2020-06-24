@@ -22,11 +22,12 @@ pub struct Container {
     pub format: Option<String>,
     pub example: Option<String>,
     pub inline: bool,
-    pub explicit_model_type: Option<ModelType>,
+    pub explicit_model_type: Option<ExplicitModelType>,
     pub model_type: ModelType,
 }
 
 impl Container {
+    #[allow(clippy::cognitive_complexity)]
     pub fn from_ast(cx: &ParsingContext, input: &syn::DeriveInput) -> Self {
         let mut ser_name = Attr::none(cx, RENAME);
         let mut rename_rule = Attr::none(cx, RENAME_ALL);
@@ -75,12 +76,11 @@ impl Container {
                 (AttrFrom::Serde, Meta(Path(word))) if word == TRANSPARENT => {
                     transparent.set_true(word);
                 }
-                (AttrFrom::Serde, Meta(Path(word))) if word == UNTAGGED => match input.data {
-                    syn::Data::Enum(_) => {
+                (AttrFrom::Serde, Meta(Path(word))) if word == UNTAGGED => {
+                    if let syn::Data::Enum(_) = input.data {
                         untagged.set_true(word);
                     }
-                    _ => {}
-                },
+                }
                 (AttrFrom::Serde, Meta(NameValue(m))) if m.path == TAG => {
                     if let Ok(s) = get_lit_str_simple(&m.lit) {
                         match &input.data {
@@ -108,19 +108,19 @@ impl Container {
                         description.set(lit, s.value().clone());
                     }
                 }
-                (AttrFrom::Opg, Meta(NameValue(m))) if &m.path == FORMAT => {
+                (AttrFrom::Opg, Meta(NameValue(m))) if m.path == FORMAT => {
                     if let Ok(s) = get_lit_str(cx, FORMAT, &m.lit) {
                         format.set(&m.path, s.value().clone())
                     }
                 }
-                (AttrFrom::Opg, Meta(NameValue(m))) if &m.path == EXAMPLE => {
+                (AttrFrom::Opg, Meta(NameValue(m))) if m.path == EXAMPLE => {
                     if let Ok(s) = get_lit_str(cx, EXAMPLE, &m.lit) {
                         example.set(&m.path, s.value().clone())
                     }
                 }
                 (AttrFrom::Opg, Meta(Path(word))) if word == INLINE => inline.set_true(word),
                 (AttrFrom::Opg, Meta(Path(word))) => {
-                    if let Ok(t) = ModelType::from_path(word) {
+                    if let Ok(t) = ExplicitModelType::from_path(word) {
                         model_type.set(word, t);
                     } else {
                         cx.error_spanned_by(word, "unknown attribute")
@@ -142,7 +142,7 @@ impl Container {
 
         let tag_type = decide_tag(untagged, internal_tag, content);
         let explicit_model_type = model_type.at_most_one();
-        let model_type = decide_model_type(cx, input, &tag_type, explicit_model_type);
+        let model_type = decide_model_type(cx, input, &tag_type).unwrap_or(ModelType::Object);
 
         Self {
             name: Name::from_attrs(unraw(&input.ident), ser_name),
@@ -169,7 +169,7 @@ pub struct Variant {
     pub format: Option<String>,
     pub example: Option<String>,
     pub inline: bool,
-    pub explicit_model_type: Option<ModelType>,
+    pub explicit_model_type: Option<ExplicitModelType>,
 }
 
 impl Variant {
@@ -224,19 +224,19 @@ impl Variant {
                         description.set(lit, s.value().clone());
                     }
                 }
-                (AttrFrom::Opg, Meta(NameValue(m))) if &m.path == FORMAT => {
+                (AttrFrom::Opg, Meta(NameValue(m))) if m.path == FORMAT => {
                     if let Ok(s) = get_lit_str(cx, FORMAT, &m.lit) {
                         format.set(&m.path, s.value().clone())
                     }
                 }
-                (AttrFrom::Opg, Meta(NameValue(m))) if &m.path == EXAMPLE => {
+                (AttrFrom::Opg, Meta(NameValue(m))) if m.path == EXAMPLE => {
                     if let Ok(s) = get_lit_str(cx, EXAMPLE, &m.lit) {
                         example.set(&m.path, s.value().clone())
                     }
                 }
                 (AttrFrom::Opg, Meta(Path(word))) if word == INLINE => inline.set_true(word),
                 (AttrFrom::Opg, Meta(Path(word))) => {
-                    if let Ok(t) = ModelType::from_path(word) {
+                    if let Ok(t) = ExplicitModelType::from_path(word) {
                         model_type.set(word, t);
                     } else {
                         cx.error_spanned_by(word, "unknown attribute")
@@ -268,7 +268,7 @@ impl Variant {
         }
     }
 
-    pub fn rename_by_rule(&mut self, rule: &RenameRule) {
+    pub fn rename_by_rule(&mut self, rule: RenameRule) {
         self.name.rename_as_variant(rule);
     }
 }
@@ -284,7 +284,7 @@ pub struct Field {
     pub format: Option<String>,
     pub example: Option<String>,
     pub inline: bool,
-    pub explicit_model_type: Option<ModelType>,
+    pub explicit_model_type: Option<ExplicitModelType>,
 }
 
 impl Field {
@@ -340,12 +340,12 @@ impl Field {
                         description.set(lit, s.value().clone());
                     }
                 }
-                (AttrFrom::Opg, Meta(NameValue(m))) if &m.path == FORMAT => {
+                (AttrFrom::Opg, Meta(NameValue(m))) if m.path == FORMAT => {
                     if let Ok(s) = get_lit_str(cx, FORMAT, &m.lit) {
                         format.set(&m.path, s.value().clone())
                     }
                 }
-                (AttrFrom::Opg, Meta(NameValue(m))) if &m.path == EXAMPLE => {
+                (AttrFrom::Opg, Meta(NameValue(m))) if m.path == EXAMPLE => {
                     if let Ok(s) = get_lit_str(cx, EXAMPLE, &m.lit) {
                         example.set(&m.path, s.value().clone())
                     }
@@ -353,7 +353,7 @@ impl Field {
                 (AttrFrom::Opg, Meta(Path(word))) if word == OPTIONAL => optional.set_true(word),
                 (AttrFrom::Opg, Meta(Path(word))) if word == INLINE => inline.set_true(word),
                 (AttrFrom::Opg, Meta(Path(word))) => {
-                    if let Ok(t) = ModelType::from_path(word) {
+                    if let Ok(t) = ExplicitModelType::from_path(word) {
                         model_type.set(word, t);
                     } else {
                         cx.error_spanned_by(word, "unknown attribute")
@@ -387,56 +387,45 @@ impl Field {
         }
     }
 
-    pub fn rename_by_rule(&mut self, rule: &RenameRule) {
+    pub fn rename_by_rule(&mut self, rule: RenameRule) {
         self.name.rename_as_field(rule);
     }
 }
 
 #[derive(Copy, Clone)]
-pub enum ModelType {
-    NewTypeString,
-    NewTypeInteger,
-    NewTypeNumber,
-    NewTypeBoolean,
-    NewTypeArray,
-    Object,
-    Dictionary,
-    OneOf,
+pub enum ExplicitModelType {
+    String,
+    Integer,
+    Number,
+    Boolean,
     Any,
 }
 
-impl ModelType {
-    pub fn is_newtype(&self) -> bool {
-        match self {
-            ModelType::NewTypeString
-            | ModelType::NewTypeInteger
-            | ModelType::NewTypeNumber
-            | ModelType::NewTypeBoolean
-            | ModelType::NewTypeArray => true,
-            _ => false,
-        }
-    }
-
+impl ExplicitModelType {
     fn from_path(p: &syn::Path) -> Result<Self, ()> {
         // can't use match here ;(
         if p == STRING {
-            Ok(ModelType::NewTypeString)
+            Ok(ExplicitModelType::String)
         } else if p == NUMBER {
-            Ok(ModelType::NewTypeNumber)
+            Ok(ExplicitModelType::Number)
         } else if p == INTEGER {
-            Ok(ModelType::NewTypeInteger)
+            Ok(ExplicitModelType::Integer)
         } else if p == BOOLEAN {
-            Ok(ModelType::NewTypeBoolean)
-        } else if p == ARRAY {
-            Ok(ModelType::NewTypeArray)
-        } else if p == ONE_OF {
-            Ok(ModelType::OneOf)
+            Ok(ExplicitModelType::Boolean)
         } else if p == ANY {
-            Ok(ModelType::Any)
+            Ok(ExplicitModelType::Any)
         } else {
             Err(())
         }
     }
+}
+
+#[derive(Copy, Clone)]
+pub enum ModelType {
+    NewType,
+    Object,
+    OneOf,
+    Dictionary,
 }
 
 pub enum TagType {
@@ -464,84 +453,45 @@ fn decide_model_type(
     cx: &ParsingContext,
     input: &syn::DeriveInput,
     tag_type: &TagType,
-    model_type: Option<ModelType>,
-) -> ModelType {
-    match (&input.data, model_type) {
-        (syn::Data::Enum(_), None) => match tag_type {
-            TagType::None | TagType::Internal { .. } => ModelType::OneOf,
-            TagType::External => ModelType::Dictionary,
-            TagType::Adjacent { .. } => ModelType::Object,
-        },
-        (syn::Data::Enum(_), Some(ModelType::OneOf)) => match tag_type {
-            TagType::None => ModelType::OneOf,
-            _ => {
-                cx.error_spanned_by(
-                    &input.ident,
-                    "only untagged enums are supported by `enum_string`",
-                );
-                ModelType::Any
-            }
-        },
-        (syn::Data::Enum(syn::DataEnum { variants, .. }), Some(ModelType::NewTypeString)) => {
-            for variant in variants {
-                match &variant.fields {
-                    syn::Fields::Unit => {}
-                    _ => {
+) -> Result<ModelType, ()> {
+    Ok(match &input.data {
+        syn::Data::Enum(variants) => {
+            if variants
+                .variants
+                .iter()
+                .all(|field| matches!(field.fields, syn::Fields::Unit))
+            {
+                return match tag_type {
+                    TagType::None => {
                         cx.error_spanned_by(
                             &input.ident,
-                            "only unit variants are supported by enum as `string`",
+                            "unit enums are not supported for untagged",
                         );
-                        break;
+                        Err(())
                     }
-                }
+                    _ => Ok(ModelType::NewType),
+                };
             }
-            ModelType::NewTypeString
+
+            match tag_type {
+                TagType::None | TagType::Internal { .. } => ModelType::OneOf,
+                TagType::External => ModelType::Dictionary,
+                TagType::Adjacent { .. } => ModelType::Object,
+            }
         }
-        (syn::Data::Struct(syn::DataStruct { fields, .. }), None) => match fields {
+        syn::Data::Struct(syn::DataStruct { fields, .. }) => match fields {
             syn::Fields::Named(_) => ModelType::Object,
-            syn::Fields::Unnamed(fields) => {
-                if fields.unnamed.len() == 1 {
-                    ModelType::NewTypeString // string newtype by default
-                } else {
-                    ModelType::NewTypeArray // TODO: should type be determined at this stage?
-                }
-            }
+            syn::Fields::Unnamed(_) => ModelType::NewType,
             syn::Fields::Unit => {
                 cx.error_spanned_by(&input.ident, "unit structs are not supported");
-                ModelType::Any
+                return Err(());
             }
         },
-        (syn::Data::Struct(syn::DataStruct { fields, .. }), Some(model_type))
-            if model_type.is_newtype() =>
-        {
-            match fields {
-                syn::Fields::Unnamed(fields) => {
-                    if fields.unnamed.len() == 1 {
-                        model_type
-                    } else {
-                        cx.error_spanned_by(&input.ident, "tuples can't be represented as newtype");
-                        ModelType::Any
-                    }
-                }
-                syn::Fields::Named(_) => {
-                    cx.error_spanned_by(
-                        &input.ident,
-                        "named structs can't be represented as newtype",
-                    );
-                    ModelType::Any
-                }
-                syn::Fields::Unit => {
-                    cx.error_spanned_by(&input.ident, "unit structs are not supported");
-                    ModelType::Any
-                }
-            }
-        }
-        (_, Some(ModelType::Any)) => ModelType::Any,
         _ => {
-            cx.error_spanned_by(&input.ident, "unable to determine model type");
-            ModelType::Any
+            cx.error_spanned_by(&input.ident, "unions are not supported");
+            return Err(());
         }
-    }
+    })
 }
 
 fn get_renames<'a>(
@@ -867,13 +817,13 @@ impl Name {
         }
     }
 
-    pub fn rename_as_variant(&mut self, rename_rule: &RenameRule) {
+    pub fn rename_as_variant(&mut self, rename_rule: RenameRule) {
         if !self.renamed {
             self.serialized_name = rename_rule.apply_to_variant(&self.source_name);
         }
     }
 
-    pub fn rename_as_field(&mut self, rename_rule: &RenameRule) {
+    pub fn rename_as_field(&mut self, rename_rule: RenameRule) {
         if !self.renamed {
             self.serialized_name = rename_rule.apply_to_field(&self.source_name);
         }
