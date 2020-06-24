@@ -3,7 +3,7 @@ mod tests {
     use opg::*;
     use serde::Serialize;
 
-    #[derive(Serialize, Deserialize, OpgModel)]
+    #[derive(Serialize, OpgModel)]
     pub enum LedgerAccountId {
         IssuedLoansAndCredits = 5586,
         LiabilitiesForSale = 4909,
