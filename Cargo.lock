@@ -29,7 +29,7 @@ checksum = "8dd5a6d5999d9907cda8ed67bbd137d3af8085216c2ac62de5be860bd41f304a"
 
 [[package]]
 name = "opg"
-version = "0.0.7"
+version = "0.0.8"
 dependencies = [
  "itertools",
  "opg_derive",
@@ -39,7 +39,7 @@ dependencies = [
 
 [[package]]
 name = "opg_derive"
-version = "0.0.7"
+version = "0.0.8"
 dependencies = [
  "itertools",
  "opg",
