@@ -29,7 +29,7 @@ checksum = "8dd5a6d5999d9907cda8ed67bbd137d3af8085216c2ac62de5be860bd41f304a"
 
 [[package]]
 name = "opg"
-version = "0.0.8"
+version = "0.0.9"
 dependencies = [
  "itertools",
  "opg_derive",
@@ -39,7 +39,7 @@ dependencies = [
 
 [[package]]
 name = "opg_derive"
-version = "0.0.8"
+version = "0.0.9"
 dependencies = [
  "itertools",
  "opg",
@@ -54,6 +54,7 @@ version = "0.0.0"
 dependencies = [
  "opg",
  "serde",
+ "serde_repr",
  "serde_yaml",
 ]
 
@@ -89,6 +90,17 @@ name = "serde_derive"
 version = "1.0.113"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93c5eaa17d0954cb481cdcfffe9d84fcfa7a1a9f2349271e678677be4c26ae31"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "serde_repr"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2dc6b7951b17b051f3210b063f12cc17320e2fe30ae05b0fe2a3abb068551c76"
 dependencies = [
  "proc-macro2",
  "quote",

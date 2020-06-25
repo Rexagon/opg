@@ -37,7 +37,7 @@ impl<'a> Container<'a> {
         let mut attrs = attr::Container::from_ast(cx, input);
 
         let mut data = match &input.data {
-            syn::Data::Enum(data) => Data::Enum(enum_from_ast(cx, &data.variants)),
+            syn::Data::Enum(data) => Data::Enum(enum_from_ast(cx, &data.variants)?),
             syn::Data::Struct(data) => {
                 let (style, fields) = struct_from_ast(cx, &data.fields);
                 Data::Struct(style, fields)
@@ -102,21 +102,38 @@ impl<'a> Data<'a> {
 fn enum_from_ast<'a>(
     cx: &ParsingContext,
     variants: &'a Punctuated<syn::Variant, syn::Token![,]>,
-) -> Vec<Variant<'a>> {
-    variants
-        .iter()
-        .map(|variant| {
-            let attrs = attr::Variant::from_ast(cx, variant);
-            let (style, fields) = struct_from_ast(cx, &variant.fields);
-            Variant {
-                ident: variant.ident.clone(),
-                attrs,
-                style,
-                fields,
-                original: variant,
+) -> Option<Vec<Variant<'a>>> {
+    let has_consistent_discriminants = {
+        let mut iter = variants.iter();
+        match iter.next() {
+            Some(variant) => {
+                iter.all(|item| item.discriminant.is_some() == variant.discriminant.is_some())
             }
-        })
-        .collect()
+            None => true,
+        }
+    };
+
+    if !has_consistent_discriminants {
+        cx.error_spanned_by(variants, "varant discriminants are not consistent");
+        return None;
+    }
+
+    Some(
+        variants
+            .iter()
+            .map(|variant| {
+                let attrs = attr::Variant::from_ast(cx, variant);
+                let (style, fields) = struct_from_ast(cx, &variant.fields);
+                Variant {
+                    ident: variant.ident.clone(),
+                    attrs,
+                    style,
+                    fields,
+                    original: variant,
+                }
+            })
+            .collect(),
+    )
 }
 
 fn struct_from_ast<'a>(

@@ -17,6 +17,7 @@ pub struct Container {
     pub transparent: bool,
     pub tag_type: TagType,
     pub has_flatten: bool,
+    pub has_repr: bool,
 
     pub description: Option<String>,
     pub format: Option<String>,
@@ -35,6 +36,7 @@ impl Container {
         let mut untagged = BoolAttr::none(cx, UNTAGGED);
         let mut internal_tag = Attr::none(cx, TAG);
         let mut content = Attr::none(cx, CONTENT);
+        let mut has_repr = BoolAttr::none(cx, REPR);
 
         let mut description = Attr::none(cx, DESCRIPTION);
         let mut format = Attr::none(cx, FORMAT);
@@ -137,6 +139,9 @@ impl Container {
                         format!("unknown opg variant attribute `{}`", path),
                     );
                 }
+                (AttrFrom::Repr, item) => {
+                    has_repr.set_true(item);
+                }
             }
         }
 
@@ -150,6 +155,7 @@ impl Container {
             transparent: transparent.get(),
             tag_type,
             has_flatten: false,
+            has_repr: has_repr.get(),
             description: description.get(),
             format: format.get(),
             example: example.get(),
@@ -253,6 +259,7 @@ impl Variant {
                         format!("unknown opg variant attribute `{}`", path),
                     );
                 }
+                (AttrFrom::Repr, _) => {}
             }
         }
 
@@ -370,6 +377,7 @@ impl Field {
                         format!("unknown opg variant attribute `{}`", path),
                     );
                 }
+                (AttrFrom::Repr, _) => {}
             }
         }
 
@@ -610,6 +618,8 @@ fn get_meta_items(
         AttrFrom::Opg
     } else if attr.path == SERDE {
         AttrFrom::Serde
+    } else if attr.path == REPR {
+        AttrFrom::Repr
     } else {
         return Ok(Vec::new());
     };
@@ -635,6 +645,7 @@ fn get_meta_items(
 enum AttrFrom {
     Serde,
     Opg,
+    Repr,
 }
 
 impl std::fmt::Display for AttrFrom {
@@ -642,6 +653,7 @@ impl std::fmt::Display for AttrFrom {
         match self {
             AttrFrom::Serde => f.write_str(SERDE.inner()),
             AttrFrom::Opg => f.write_str(OPG.inner()),
+            AttrFrom::Repr => f.write_str(REPR.inner()),
         }
     }
 }

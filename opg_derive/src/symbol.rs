@@ -41,6 +41,9 @@ define_symbols! {
     RENAME_ALL => "rename_all",
     SERIALIZE => "serialize",
     DESERIALIZE => "deserialize",
+
+    // misc
+    REPR => "repr",
 }
 
 #[derive(Copy, Clone)]

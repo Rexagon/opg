@@ -55,24 +55,62 @@ fn serialize_enum(container: &Container, variants: &[Variant]) -> proc_macro2::T
 fn serialize_newtype_enum(container: &Container, variants: &[Variant]) -> proc_macro2::TokenStream {
     let description = option_string(container.attrs.description.as_deref());
 
-    let variants = variants
-        .iter()
-        .filter(|variant| !variant.attrs.skip_serializing)
-        .map(|variant| variant.attrs.name.serialized())
-        .collect::<Vec<_>>();
+    let body = if container.attrs.has_repr {
+        let variants = variants
+            .iter()
+            .filter(|variant| !variant.attrs.skip_serializing)
+            .filter_map(|variant| {
+                variant
+                    .original
+                    .discriminant
+                    .as_ref()
+                    .map(|(_, discriminant)| (variant.attrs.name.serialized(), discriminant))
+            })
+            .map(|(name, discriminant)| {
+                let description = format!("{} variant", name);
+                let example = quote::ToTokens::to_token_stream(discriminant).to_string();
 
-    let example = option_string(variants.first().map(|x| x.as_str()));
-
-    let body = quote! {
-        _opg::Model {
-            description: #description,
-            data: _opg::ModelData::Single(_opg::ModelTypeDescription::String(_opg::ModelString {
-                variants: Some(vec![#(#variants.to_owned()),*]),
-                data: _opg::ModelSimple {
-                    format: None,
-                    example: #example,
+                quote! {
+                    _opg::Model {
+                        description: Some(#description.to_owned()),
+                        data: _opg::ModelData::Single(_opg::ModelTypeDescription::Integer(_opg::ModelSimple {
+                            format: None,
+                            example: Some(#example.to_owned()),
+                        })),
+                    }
                 }
-            }))
+            })
+            .map(inline_reference)
+            .collect::<Vec<_>>();
+
+        quote! {
+            _opg::Model {
+                description: #description,
+                data: _opg::ModelData::OneOf(_opg::ModelOneOf {
+                    one_of: vec![#(#variants),*],
+                })
+            }
+        }
+    } else {
+        let variants = variants
+            .iter()
+            .filter(|variant| !variant.attrs.skip_serializing)
+            .map(|variant| variant.attrs.name.serialized())
+            .collect::<Vec<_>>();
+
+        let example = option_string(variants.first().map(|x| x.as_str()));
+
+        quote! {
+            _opg::Model {
+                description: #description,
+                data: _opg::ModelData::Single(_opg::ModelTypeDescription::String(_opg::ModelString {
+                    variants: Some(vec![#(#variants.to_owned()),*]),
+                    data: _opg::ModelSimple {
+                        format: None,
+                        example: #example,
+                    }
+                }))
+            }
         }
     };
 

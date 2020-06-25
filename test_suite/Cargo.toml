@@ -10,3 +10,4 @@ opg = { path = "../opg" }
 [dev-dependencies]
 serde = "1.0"
 serde_yaml = "0.8"
+serde_repr = "0.1"
