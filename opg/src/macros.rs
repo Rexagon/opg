@@ -144,32 +144,23 @@ macro_rules! describe_type(
 
 #[macro_export]
 macro_rules! impl_opg_model(
-    ($type:ty => $serialized_type:ident) => {
-        impl $crate::OpgModel for $type {
-            fn get_structure() -> Model {
-                describe_type!($serialized_type => {})
+    (generic_simple: $($type:tt)+) => {
+        impl<T> $crate::OpgModel for $($type)+
+        where
+            T: $crate::OpgModel,
+        {
+            fn get_structure() -> $crate::Model {
+                <T as $crate::OpgModel>::get_structure()
             }
         }
     };
 
-    ($type:ty => $serialized_type:ident always_inline) => {
-        impl $crate::OpgModel for $type {
-            fn get_structure() -> Model {
-                describe_type!($serialized_type => {})
-            }
-
-            fn select_reference(_: bool, inline_params: &ContextParams) -> ModelReference {
-                Self::inject(InjectReference::Inline(inline_params))
-            }
-        }
-    };
-
-    (generic_tuple ($($type:ident),+)) => {
+    (generic_tuple: ($($type:ident),+)) => {
         impl<$($type),+> $crate::OpgModel for ($($type),+)
         where
             $($type : $crate::OpgModel),*
         {
-            fn get_structure() -> Model {
+            fn get_structure() -> $crate::Model {
                 let item_model = $crate::Model {
                     description: None,
                     data: $crate::ModelData::OneOf($crate::ModelOneOf {
@@ -185,6 +176,68 @@ macro_rules! impl_opg_model(
                 describe_type!(array => {
                     items: (raw_model => item_model)
                 })
+            }
+        }
+    };
+
+    (generic_array: $($type:tt)+) => {
+        impl<T> $crate::OpgModel for $($type)+
+        where
+            T: $crate::OpgModel,
+        {
+            fn get_structure() -> $crate::Model {
+                Model {
+                    description: None,
+                    data: $crate::ModelData::Single($crate::ModelTypeDescription::Array($crate::ModelArray {
+                        items: Box::new($crate::ModelReference::Inline(<T as $crate::OpgModel>::get_structure())),
+                    })),
+                }
+            }
+
+            #[inline(always)]
+            fn select_reference(_: bool, inline_params: &ContextParams) -> $crate::ModelReference {
+                Self::inject(InjectReference::Inline(inline_params))
+            }
+        }
+    };
+
+    (generic_dictionary: $($type:tt)+) => {
+        impl<K, T> $crate::OpgModel for $($type)+
+        where
+            T: $crate::OpgModel,
+            K: serde::ser::Serialize,
+        {
+            fn get_structure() -> $crate::Model {
+                Model {
+                    description: None,
+                    data: $crate::ModelData::Single($crate::ModelTypeDescription::Object($crate::ModelObject {
+                        additional_properties: Some(Box::new(<T as $crate::OpgModel>::select_reference(
+                            false,
+                            &$crate::ContextParams::default(),
+                        ))),
+                        ..Default::default()
+                    })),
+                }
+            }
+        }
+    };
+
+    ($serialized_type:ident: $($type:tt)+) => {
+        impl $crate::OpgModel for $($type)+ {
+            fn get_structure() -> Model {
+                describe_type!($serialized_type => {})
+            }
+        }
+    };
+
+    ($serialized_type:ident(always_inline): $($type:tt)+) => {
+        impl $crate::OpgModel for $($type)+ {
+            fn get_structure() -> Model {
+                describe_type!($serialized_type => {})
+            }
+
+            fn select_reference(_: bool, inline_params: &ContextParams) -> ModelReference {
+                Self::inject(InjectReference::Inline(inline_params))
             }
         }
     };

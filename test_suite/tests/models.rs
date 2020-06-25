@@ -261,6 +261,45 @@ items:
         );
     }
 
+    #[derive(Serialize, OpgModel)]
+    struct StructWithInner {
+        #[opg(optional)]
+        field: Option<String>,
+        #[opg(optional)]
+        super_optional: Option<Option<String>>,
+        boxed: Box<Option<i32>>,
+    }
+
+    #[test]
+    fn test_inner_type() {
+        assert_eq!(
+            serde_yaml::to_string(&StructWithInner::get_structure()).unwrap(),
+            r##"---
+type: object
+properties:
+  boxed:
+    type: integer
+  field:
+    type: string
+  super_optional:
+    type: string
+required:
+  - boxed"##
+        );
+    }
+
+    #[test]
+    fn test_hash_map() {
+        assert_eq!(
+            serde_yaml::to_string(&std::collections::HashMap::<&str, i32>::get_structure())
+                .unwrap(),
+            r##"---
+type: object
+additionalProperties:
+  type: integer"##
+        );
+    }
+
     #[test]
     fn test_serialization() {
         let model = Model {
