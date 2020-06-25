@@ -181,6 +181,7 @@ macro_rules! impl_opg_model(
     };
 
     (generic_array: $($type:tt)+) => {
+        #[allow(clippy::zero_prefixed_literal)]
         impl<T> $crate::OpgModel for $($type)+
         where
             T: $crate::OpgModel,
