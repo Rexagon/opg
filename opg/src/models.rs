@@ -345,25 +345,17 @@ impl OpgComponents {
         self.schemas.contains_key(name)
     }
 
-    pub fn add_model<N>(&mut self, name: N, model: Model)
-    where
-        N: ToString,
-    {
-        if let std::collections::btree_map::Entry::Vacant(entry) =
-            self.schemas.entry(name.to_string())
-        {
-            entry.insert(model);
-        }
-    }
-
     #[allow(dead_code)]
-    pub fn mention<M>(&mut self) -> ModelReference
+    pub fn mention<M>(&mut self, inline: bool, params: &ContextParams) -> ModelReference
     where
         M: OpgModel,
     {
-        let reference = M::select_reference(false, &Default::default());
+        let reference = M::select_reference(self, inline, &params);
         if let ModelReference::Link(link) = &reference {
-            self.add_model(link, M::get_structure())
+            if !self.schemas.contains_key(link) {
+                let structure = M::get_structure(self);
+                self.schemas.insert(link.to_owned(), structure);
+            }
         }
         reference
     }
@@ -377,39 +369,39 @@ impl OpgComponents {
             .try_for_each(|(_, model)| model.traverse(cx))
             .map_err(|first_occurrence| first_occurrence.to_owned())
     }
+
+    pub fn add_model<N>(&mut self, name: N, model: Model)
+    where
+        N: ToString,
+    {
+        if let std::collections::btree_map::Entry::Vacant(entry) =
+            self.schemas.entry(name.to_string())
+        {
+            entry.insert(model);
+        }
+    }
 }
 
 pub trait OpgModel {
-    fn get_structure() -> Model;
+    fn get_structure(cx: &mut OpgComponents) -> Model;
 
     fn get_type_name() -> Option<&'static str>;
 
-    fn get_structure_with_params(params: &ContextParams) -> Model {
-        Self::get_structure().apply_params(params)
+    fn get_structure_with_params(cx: &mut OpgComponents, params: &ContextParams) -> Model {
+        Self::get_structure(cx).apply_params(params)
     }
 
     #[inline(always)]
-    fn select_reference(inline: bool, inline_params: &ContextParams) -> ModelReference {
+    fn select_reference(
+        cx: &mut OpgComponents,
+        inline: bool,
+        params: &ContextParams,
+    ) -> ModelReference {
         match Self::get_type_name() {
-            Some(link) if !inline => Self::inject(InjectReference::AsLink(link)),
-            _ => Self::inject(InjectReference::Inline(inline_params)),
+            Some(link) if !inline => ModelReference::Link(link.to_owned()),
+            _ => ModelReference::Inline(Self::get_structure(cx).apply_params(params)),
         }
     }
-
-    #[inline(always)]
-    fn inject(inject_as: InjectReference) -> ModelReference {
-        match inject_as {
-            InjectReference::Inline(params) => {
-                ModelReference::Inline(Self::get_structure().apply_params(params))
-            }
-            InjectReference::AsLink(link) => ModelReference::Link(link.to_string()),
-        }
-    }
-}
-
-pub enum InjectReference<'a> {
-    Inline(&'a ContextParams),
-    AsLink(&'a str),
 }
 
 #[derive(Default)]

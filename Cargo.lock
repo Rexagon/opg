@@ -71,7 +71,7 @@ dependencies = [
 
 [[package]]
 name = "opg"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "chrono",
  "itertools",
@@ -82,7 +82,7 @@ dependencies = [
 
 [[package]]
 name = "opg_derive"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "itertools",
  "opg",

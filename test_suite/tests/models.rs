@@ -13,8 +13,10 @@ mod tests {
 
     #[test]
     fn test_newtype() {
+        let mut cx = OpgComponents::new();
+
         assert_eq!(
-            serde_yaml::to_string(&NewType::get_structure()).unwrap(),
+            serde_yaml::to_string(&NewType::get_structure(&mut cx)).unwrap(),
             r##"---
 description: New type description
 type: string
@@ -23,7 +25,7 @@ example: 000-000"##
         );
 
         assert_eq!(
-            serde_yaml::to_string(&NewNewType::get_structure()).unwrap(),
+            serde_yaml::to_string(&NewNewType::get_structure(&mut cx)).unwrap(),
             r##"---
 description: Override description
 type: string
@@ -42,8 +44,9 @@ example: 000-000"##
 
     #[test]
     fn test_simple_struct() {
+        let mut cx = &mut OpgComponents::default();
         assert_eq!(
-            serde_yaml::to_string(&SimpleStruct::get_structure()).unwrap(),
+            serde_yaml::to_string(&SimpleStruct::get_structure(&mut cx)).unwrap(),
             r##"---
 type: object
 properties:
@@ -67,8 +70,9 @@ required:
 
     #[test]
     fn test_string_enum() {
+        let mut cx = &mut OpgComponents::default();
         assert_eq!(
-            serde_yaml::to_string(&StringEnumTest::get_structure()).unwrap(),
+            serde_yaml::to_string(&StringEnumTest::get_structure(&mut cx)).unwrap(),
             r##"---
 description: New type description
 type: string
@@ -89,8 +93,9 @@ example: first"##
 
     #[test]
     fn test_externally_enum() {
+        let mut cx = &mut OpgComponents::default();
         assert_eq!(
-            serde_yaml::to_string(&ExternallyTaggedEnum::get_structure()).unwrap(),
+            serde_yaml::to_string(&ExternallyTaggedEnum::get_structure(&mut cx)).unwrap(),
             r##"---
 type: object
 additionalProperties:
@@ -120,8 +125,9 @@ additionalProperties:
 
     #[test]
     fn test_untagged_enum() {
+        let mut cx = &mut OpgComponents::default();
         assert_eq!(
-            serde_yaml::to_string(&UntaggedEnumTest::get_structure()).unwrap(),
+            serde_yaml::to_string(&UntaggedEnumTest::get_structure(&mut cx)).unwrap(),
             r##"---
 oneOf:
   - type: object
@@ -157,8 +163,9 @@ oneOf:
 
     #[test]
     fn test_internally_tagged_enum() {
+        let mut cx = &mut OpgComponents::default();
         assert_eq!(
-            serde_yaml::to_string(&InternallyTaggedEnum::get_structure()).unwrap(),
+            serde_yaml::to_string(&InternallyTaggedEnum::get_structure(&mut cx)).unwrap(),
             r##"---
 oneOf:
   - type: object
@@ -201,8 +208,9 @@ oneOf:
 
     #[test]
     fn test_adjacently_tagged_enum() {
+        let mut cx = &mut OpgComponents::default();
         assert_eq!(
-            serde_yaml::to_string(&AdjacentlyTaggedEnum::get_structure()).unwrap(),
+            serde_yaml::to_string(&AdjacentlyTaggedEnum::get_structure(&mut cx)).unwrap(),
             r##"---
 type: object
 properties:
@@ -236,8 +244,9 @@ required:
 
     #[test]
     fn test_type_changed_struct() {
+        let mut cx = &mut OpgComponents::default();
         assert_eq!(
-            serde_yaml::to_string(&TypeChangedStruct::get_structure()).unwrap(),
+            serde_yaml::to_string(&TypeChangedStruct::get_structure(&mut cx)).unwrap(),
             r##"---
 type: object
 properties:
@@ -250,8 +259,9 @@ required:
 
     #[test]
     fn test_tuples() {
+        let mut cx = &mut OpgComponents::default();
         assert_eq!(
-            serde_yaml::to_string(&<(String, u64)>::get_structure()).unwrap(),
+            serde_yaml::to_string(&<(String, u64)>::get_structure(&mut cx)).unwrap(),
             r##"---
 type: array
 items:
@@ -271,8 +281,9 @@ items:
 
     #[test]
     fn test_inner_type() {
+        let mut cx = &mut OpgComponents::default();
         assert_eq!(
-            serde_yaml::to_string(&StructWithInner::get_structure()).unwrap(),
+            serde_yaml::to_string(&StructWithInner::get_structure(&mut cx)).unwrap(),
             r##"---
 type: object
 properties:
@@ -293,9 +304,12 @@ required:
 
     #[test]
     fn test_hash_map() {
+        let mut cx = &mut OpgComponents::default();
         assert_eq!(
-            serde_yaml::to_string(&std::collections::HashMap::<&str, i32>::get_structure())
-                .unwrap(),
+            serde_yaml::to_string(&std::collections::HashMap::<&str, i32>::get_structure(
+                &mut cx
+            ))
+            .unwrap(),
             r##"---
 type: object
 additionalProperties:
@@ -308,8 +322,9 @@ additionalProperties:
 
     #[test]
     fn test_nullable_newtype() {
+        let mut cx = &mut OpgComponents::default();
         assert_eq!(
-            serde_yaml::to_string(&NullableNewtype::get_structure()).unwrap(),
+            serde_yaml::to_string(&NullableNewtype::get_structure(&mut cx)).unwrap(),
             r##"---
 nullable: true
 type: integer"##
@@ -324,8 +339,29 @@ type: integer"##
 
     #[test]
     fn test_nullable_field() {
+        let mut cx = &mut OpgComponents::default();
         assert_eq!(
-            serde_yaml::to_string(&StructWithNullable::get_structure()).unwrap(),
+            serde_yaml::to_string(&StructWithNullable::get_structure(&mut cx)).unwrap(),
+            r##"---
+type: object
+properties:
+  field:
+    nullable: true
+    type: integer
+required:
+  - field"##
+        );
+    }
+
+    #[derive(Serialize, OpgModel)]
+    struct Recursive {
+        recursive_field: Option<NewType>,
+    }
+
+    fn test_recursive() {
+        let mut cx = &mut OpgComponents::default();
+        assert_eq!(
+            serde_yaml::to_string(&Recursive::get_structure(&mut cx)).unwrap(),
             r##"---
 type: object
 properties:

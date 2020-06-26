@@ -167,8 +167,8 @@ macro_rules! impl_opg_model(
         where
             T: $crate::OpgModel,
         {
-            fn get_structure() -> $crate::Model {
-                <T as $crate::OpgModel>::get_structure_with_params(&$crate::ContextParams {
+            fn get_structure(cx: &mut $crate::OpgComponents) -> $crate::Model {
+                <T as $crate::OpgModel>::get_structure_with_params(cx, &$crate::ContextParams {
                     nullable: Some(true),
                     ..Default::default()
                 })
@@ -186,8 +186,8 @@ macro_rules! impl_opg_model(
         where
             T: $crate::OpgModel,
         {
-            fn get_structure() -> $crate::Model {
-                <T as $crate::OpgModel>::get_structure()
+            fn get_structure(cx: &mut $crate::OpgComponents) -> $crate::Model {
+                <T as $crate::OpgModel>::get_structure(cx)
             }
 
             #[inline(always)]
@@ -202,15 +202,12 @@ macro_rules! impl_opg_model(
         where
             $($type : $crate::OpgModel),*
         {
-            fn get_structure() -> $crate::Model {
+            fn get_structure(cx: &mut $crate::OpgComponents) -> $crate::Model {
                 let item_model = $crate::Model {
                     description: None,
                     data: $crate::ModelData::OneOf($crate::ModelOneOf {
                         one_of: vec![
-                            $(<$type as $crate::OpgModel>::select_reference(
-                                false,
-                                &Default::default(),
-                            )),*
+                            $(cx.mention::<$type>(false, &Default::default())),*
                         ],
                     }),
                 };
@@ -221,8 +218,8 @@ macro_rules! impl_opg_model(
             }
 
             #[inline(always)]
-            fn select_reference(_: bool, inline_params: &ContextParams) -> $crate::ModelReference {
-                Self::inject(InjectReference::Inline(inline_params))
+            fn select_reference(cx: &mut $crate::OpgComponents, _: bool, params: &$crate::ContextParams) -> $crate::ModelReference {
+                $crate::ModelReference::Inline(Self::get_structure(cx).apply_params(params))
             }
 
             #[inline(always)]
@@ -238,21 +235,21 @@ macro_rules! impl_opg_model(
         where
             T: $crate::OpgModel,
         {
-            fn get_structure() -> $crate::Model {
+            fn get_structure(cx: &mut $crate::OpgComponents) -> $crate::Model {
                 Model {
                     description: None,
                     data: $crate::ModelData::Single($crate::ModelType {
                         nullable: false,
                         type_description: $crate::ModelTypeDescription::Array($crate::ModelArray {
-                            items: Box::new($crate::ModelReference::Inline(<T as $crate::OpgModel>::get_structure())),
+                            items: Box::new(cx.mention::<T>(false, &Default::default())),
                         })
                     }),
                 }
             }
 
             #[inline(always)]
-            fn select_reference(_: bool, inline_params: &ContextParams) -> $crate::ModelReference {
-                Self::inject(InjectReference::Inline(inline_params))
+            fn select_reference(cx: &mut $crate::OpgComponents, _: bool, params: &$crate::ContextParams) -> $crate::ModelReference {
+                $crate::ModelReference::Inline(Self::get_structure(cx).apply_params(params))
             }
 
             #[inline(always)]
@@ -268,16 +265,13 @@ macro_rules! impl_opg_model(
             T: $crate::OpgModel,
             K: serde::ser::Serialize,
         {
-            fn get_structure() -> $crate::Model {
+            fn get_structure(cx: &mut $crate::OpgComponents) -> $crate::Model {
                 Model {
                     description: None,
                     data: $crate::ModelData::Single($crate::ModelType {
                         nullable: false,
                         type_description: $crate::ModelTypeDescription::Object($crate::ModelObject {
-                            additional_properties: Some(Box::new(<T as $crate::OpgModel>::select_reference(
-                                false,
-                                &$crate::ContextParams::default(),
-                            ))),
+                            additional_properties: Some(Box::new(cx.mention::<T>(false, &Default::default()))),
                             ..Default::default()
                         })
                     }),
@@ -285,8 +279,8 @@ macro_rules! impl_opg_model(
             }
 
             #[inline(always)]
-            fn select_reference(_: bool, inline_params: &ContextParams) -> $crate::ModelReference {
-                Self::inject(InjectReference::Inline(inline_params))
+            fn select_reference(cx: &mut $crate::OpgComponents, _: bool, params: &$crate::ContextParams) -> $crate::ModelReference {
+                $crate::ModelReference::Inline(Self::get_structure(cx).apply_params(params))
             }
 
             #[inline(always)]
@@ -298,7 +292,7 @@ macro_rules! impl_opg_model(
 
     ($serialized_type:ident: $($type:tt)+) => {
         impl $crate::OpgModel for $($type)+ {
-            fn get_structure() -> Model {
+            fn get_structure(cx: &mut $crate::OpgComponents) -> Model {
                 describe_type!($serialized_type => {})
             }
 
@@ -311,12 +305,13 @@ macro_rules! impl_opg_model(
 
     ($serialized_type:ident(always_inline): $($type:tt)+) => {
         impl $crate::OpgModel for $($type)+ {
-            fn get_structure() -> Model {
+            fn get_structure(_: &mut $crate::OpgComponents) -> Model {
                 describe_type!($serialized_type => {})
             }
 
-            fn select_reference(_: bool, inline_params: &ContextParams) -> ModelReference {
-                Self::inject(InjectReference::Inline(inline_params))
+            #[inline(always)]
+            fn select_reference(cx: &mut $crate::OpgComponents, _: bool, params: &$crate::ContextParams) -> $crate::ModelReference {
+                $crate::ModelReference::Inline(Self::get_structure(cx).apply_params(params))
             }
 
             #[inline(always)]
@@ -377,7 +372,7 @@ macro_rules! describe_api {
             let mut path = Vec::new();
             let mut context = $crate::models::OpgPathValue::default();
 
-            describe_api!(@opg_path_url path context $first_path_segment $($path_segment)*);
+            describe_api!(@opg_path_url path $components context $first_path_segment $($path_segment)*);
             describe_api!(@opg_path_value_properties $components context $($properties)*);
 
             result.push(($crate::models::OpgPath(path), context));
@@ -422,7 +417,7 @@ macro_rules! describe_api {
         let schema = std::marker::PhantomData::<()>; // just as stub
         describe_api!(@opg_path_value_body_properties $components description required schema $($body)*);
         $context.request_body = Some($crate::models::OpgRequestBody {
-           description,
+           description: description.or(Some(String::new())),
            required,
            schema, // schema must be specified
         });
@@ -431,7 +426,7 @@ macro_rules! describe_api {
     (@opg_path_value_operation_properties $components:ident $context:ident $(,)? $response:literal($description:literal): $type:path, $($other:tt)*) => {
         $context.responses.insert($response, $crate::models::OpgResponse {
             description: $description.to_owned(),
-            schema: $components.mention::<$type>()
+            schema: $components.mention::<$type>(false, &Default::default())
         });
         describe_api!(@opg_path_value_operation_properties $components $context $($other)*)
     };
@@ -439,7 +434,7 @@ macro_rules! describe_api {
 
 
     (@opg_path_value_body_properties $components:ident $description:ident $required:ident $schema:ident $(,)? schema: $type:path, $($other:tt)*) => {
-        let $schema = $components.mention::<$type>();
+        let $schema = $components.mention::<$type>(false, &Default::default());
         describe_api!(@opg_path_value_body_properties $components $description $required $schema $($other)*)
     };
     (@opg_path_value_body_properties $components:ident $description:ident $required:ident $schema:ident $(,)? description: $value:literal $($other:tt)*) => {
@@ -458,7 +453,7 @@ macro_rules! describe_api {
             description: None,
             parameter_in: $crate::models::OpgOperationParameterIn::Header,
             required: false,
-            schema: Some(String::select_reference(false, &Default::default())),
+            schema: Some($components.mention::<String>(false, &Default::default())),
         };
         describe_api!(@opg_path_value_parameter_properties $components parameter $($properties)*);
         $context.parameters.insert($name.to_owned(), parameter);
@@ -468,10 +463,7 @@ macro_rules! describe_api {
             description: None,
             parameter_in: $crate::models::OpgOperationParameterIn::Header,
             required: false,
-            schema: Some(<$type as $crate::models::OpgModel>::select_reference(
-                false,
-                &Default::default(),
-            ))
+            schema: Some($components.mention::<$type>(false, &Default::default())),
         };
         describe_api!(@opg_path_value_parameter_properties $components parameter $($properties)*);
         $context.parameters.insert(stringify!($name).to_owned(), parameter);
@@ -487,43 +479,38 @@ macro_rules! describe_api {
         describe_api!(@opg_path_value_parameter_properties $components $context $($other)*)
     };
     (@opg_path_value_parameter_properties $components:ident $context:ident $(,)? schema: $type:path, $($other:tt)*) => {
-        $context.schema = Some($components.mention::<$type>());
+        $context.schema = Some($components.mention::<$type>(false, &Default::default()));
         describe_api!(@opg_path_value_parameter_properties $components $context $($other)*)
     };
     (@opg_path_value_parameter_properties $components:ident $context:ident $(,)?) => {};
 
 
-    (@opg_path_url $path:ident $context:ident $current:tt $($other:tt)*) => {
-        $path.push(describe_api!(@opg_path_url_element $context $current));
-        describe_api!(@opg_path_url $path $context $($other)*)
+    (@opg_path_url $path:ident $components:ident $context:ident $current:tt $($other:tt)*) => {
+        $path.push(describe_api!(@opg_path_url_element $components $context $current));
+        describe_api!(@opg_path_url $path $components $context $($other)*)
     };
-    (@opg_path_url $path:ident $context:ident) => {};
+    (@opg_path_url $path:ident $components:ident $context:ident) => {};
 
-    (@opg_path_url_element $context:ident $segment:literal) => {
+    (@opg_path_url_element $components:ident $context:ident $segment:literal) => {
         $crate::models::OpgPathElement::Path($segment.to_owned())
     };
-    (@opg_path_url_element $context:ident $parameter:ty) => {{
+    (@opg_path_url_element $components:ident $context:ident $parameter:path) => {{
         let name = {
             let name = stringify!($parameter);
             string[..1].to_ascii_lowercase() + &string[1..]
         };
-        describe_api!(@opg_path_insert_url_param $context name $parameter)
+        describe_api!(@opg_path_insert_url_param $components $context name $parameter)
     }};
-    (@opg_path_url_element $context:ident {$name:ident: $parameter:ty}) => {{
+    (@opg_path_url_element $components:ident $context:ident {$name:ident: $parameter:path}) => {{
         let name = stringify!($name).to_owned();
-        describe_api!(@opg_path_insert_url_param $context name $parameter)
+        describe_api!(@opg_path_insert_url_param $components $context name $parameter)
     }};
-    (@opg_path_insert_url_param $context:ident $name:ident $parameter:ty) => {{
+    (@opg_path_insert_url_param $components:ident $context:ident $name:ident $parameter:path) => {{
         $context.parameters.insert($name.clone(), $crate::models::OpgOperationParameter {
             description: None,
             parameter_in: $crate::models::OpgOperationParameterIn::Path,
             required: true,
-            schema: Some(
-                <$parameter as $crate::models::OpgModel>::select_reference(
-                    false,
-                    &Default::default(),
-                )
-            )
+            schema: Some($components.mention::<$parameter>(false, &Default::default()))
         });
         $crate::models::OpgPathElement::Parameter($name)
     }}

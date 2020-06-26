@@ -3,7 +3,7 @@ mod tests {
     use opg::*;
     use serde::Serialize;
 
-    #[derive(Debug, Clone, Serialize, opg::OpgModel)]
+    #[derive(Serialize, opg::OpgModel)]
     #[serde(rename_all = "camelCase")]
     #[opg("New type description")]
     enum SuperResponse {
@@ -14,9 +14,16 @@ mod tests {
 
     mod request {
         use super::*;
-        #[derive(Debug, Clone, Serialize, opg::OpgModel)]
+
+        #[derive(Serialize, opg::OpgModel)]
         pub struct InModule {
             field: String,
+            second: Test,
+        }
+
+        #[derive(Serialize, opg::OpgModel)]
+        pub struct Test {
+            another_field: Option<String>,
         }
     }
 
@@ -91,7 +98,7 @@ paths:
     post:
       requestBody:
         required: true
-        description: ~
+        description: ""
         content:
           application/json:
             schema:
@@ -162,8 +169,11 @@ components:
       properties:
         field:
           type: string
+        second:
+          $ref: "#/components/schemas/Test"
       required:
         - field
+        - second
     SuperResponse:
       description: New type description
       type: string
@@ -171,7 +181,15 @@ components:
         - test
         - another
         - yay
-      example: test"##
+      example: test
+    Test:
+      type: object
+      properties:
+        another_field:
+          nullable: true
+          type: string
+      required:
+        - another_field"##
         );
     }
 }

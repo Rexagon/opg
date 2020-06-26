@@ -381,7 +381,7 @@ fn serialize_internal_tagged_enum(
                     let context_params = ContextParams::from(&field.attrs).or(&variant.attrs).tokenize();
 
                     quote! {
-                        <#type_name as _opg::OpgModel>::get_structure_with_params(&#context_params)
+                        <#type_name as _opg::OpgModel>::get_structure_with_params(cx, &#context_params)
                     }
                 }
                 StructStyle::Struct => {
@@ -501,7 +501,7 @@ fn serialize_newtype_struct(container: &Container, field: &Field) -> proc_macro2
             let context_params = context_params.tokenize();
 
             quote! {
-                <#type_name as _opg::OpgModel>::get_structure_with_params(&#context_params)
+                <#type_name as _opg::OpgModel>::get_structure_with_params(cx, &#context_params)
             }
         }
     };
@@ -660,10 +660,7 @@ fn field_model_reference<'a>(
             let context_params = context_params.tokenize();
 
             quote! {
-                <#type_name as _opg::OpgModel>::select_reference(
-                    #inline,
-                    &#context_params,
-                )
+                cx.mention::<#type_name>(#inline, &#context_params)
             }
         }
     }
@@ -746,8 +743,8 @@ fn implement_type(
             }
 
             #[inline(always)]
-            fn select_reference(_: bool, inline_params: &_opg::ContextParams) -> _opg::ModelReference {
-                Self::inject(_opg::InjectReference::Inline(inline_params))
+            fn select_reference(cx: &mut _opg::OpgComponents, _: bool, params: &_opg::ContextParams) -> _opg::ModelReference {
+                _opg::ModelReference::Inline(Self::get_structure(cx).apply_params(params))
             }
         }
     } else {
@@ -761,7 +758,7 @@ fn implement_type(
 
     quote! {
         impl _opg::OpgModel for #type_name {
-            fn get_structure() -> _opg::Model {
+            fn get_structure(cx: &mut _opg::OpgComponents) -> _opg::Model {
                 #body
             }
 

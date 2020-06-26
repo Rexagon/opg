@@ -18,8 +18,9 @@ mod tests {
 
     #[test]
     fn test_repr() {
+        let mut cx = &mut OpgComponents::default();
         assert_eq!(
-            serde_yaml::to_string(&LedgerAccountId::get_structure()).unwrap(),
+            serde_yaml::to_string(&LedgerAccountId::get_structure(&mut cx)).unwrap(),
             r##"---
 oneOf:
   - description: IssuedLoansAndCredits variant
