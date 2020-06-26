@@ -92,7 +92,7 @@ impl OpgModel for uuid::Uuid {
                 "UUID ver. 4 [rfc](https://tools.ietf.org/html/rfc4122)"
             )),
             data: ModelData::Single(ModelType {
-                nullable: true,
+                nullable: false,
                 type_description: ModelTypeDescription::String(ModelString {
                     variants: None,
                     data: ModelSimple {
@@ -107,5 +107,24 @@ impl OpgModel for uuid::Uuid {
     #[inline(always)]
     fn select_reference(_: bool, inline_params: &ContextParams) -> ModelReference {
         Self::inject(InjectReference::Inline(inline_params))
+    }
+}
+
+#[cfg(feature = "chrono")]
+impl OpgModel for chrono::NaiveDateTime {
+    fn get_structure() -> Model {
+        Model {
+            description: Some(format!("Datetime")),
+            data: ModelData::Single(ModelType {
+                nullable: false,
+                type_description: ModelTypeDescription::String(ModelString {
+                    variants: None,
+                    data: ModelSimple {
+                        format: Some(format!("YYYY-MM-DDThh:mm:ss.sTZD")),
+                        example: Some(format!("2020-06-26T14:04:20.730045106Z")),
+                    },
+                }),
+            }),
+        }
     }
 }
