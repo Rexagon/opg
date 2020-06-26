@@ -86,18 +86,16 @@ impl_opg_model!(generic_dictionary: std::collections::BTreeMap<K, T>);
 
 #[cfg(feature = "uuid")]
 impl OpgModel for uuid::Uuid {
-    fn get_structure() -> Model {
+    fn get_structure(_: &mut OpgComponents) -> Model {
         Model {
-            description: Some(format!(
-                "UUID ver. 4 [rfc](https://tools.ietf.org/html/rfc4122)"
-            )),
+            description: Some("UUID ver. 4 [rfc](https://tools.ietf.org/html/rfc4122)".to_owned()),
             data: ModelData::Single(ModelType {
                 nullable: false,
                 type_description: ModelTypeDescription::String(ModelString {
                     variants: None,
                     data: ModelSimple {
-                        format: Some(format!("uuid")),
-                        example: Some(format!("00000000-0000-0000-0000-000000000000")),
+                        format: Some("uuid".to_owned()),
+                        example: Some("00000000-0000-0000-0000-000000000000".to_owned()),
                     },
                 }),
             }),
@@ -105,26 +103,41 @@ impl OpgModel for uuid::Uuid {
     }
 
     #[inline(always)]
-    fn select_reference(_: bool, inline_params: &ContextParams) -> ModelReference {
-        Self::inject(InjectReference::Inline(inline_params))
+    fn select_reference(cx: &mut OpgComponents, _: bool, params: &ContextParams) -> ModelReference {
+        ModelReference::Inline(Self::get_structure(cx).apply_params(params))
+    }
+
+    #[inline(always)]
+    fn get_type_name() -> Option<&'static str> {
+        None
     }
 }
 
 #[cfg(feature = "chrono")]
 impl OpgModel for chrono::NaiveDateTime {
-    fn get_structure() -> Model {
+    fn get_structure(_: &mut OpgComponents) -> Model {
         Model {
-            description: Some(format!("Datetime")),
+            description: Some("Datetime".to_owned()),
             data: ModelData::Single(ModelType {
                 nullable: false,
                 type_description: ModelTypeDescription::String(ModelString {
                     variants: None,
                     data: ModelSimple {
-                        format: Some(format!("YYYY-MM-DDThh:mm:ss.sTZD")),
-                        example: Some(format!("2020-06-26T14:04:20.730045106Z")),
+                        format: Some("YYYY-MM-DDThh:mm:ss.sTZD".to_owned()),
+                        example: Some("2020-06-26T14:04:20.730045106Z".to_owned()),
                     },
                 }),
             }),
         }
+    }
+
+    #[inline(always)]
+    fn select_reference(cx: &mut OpgComponents, _: bool, params: &ContextParams) -> ModelReference {
+        ModelReference::Inline(Self::get_structure(cx).apply_params(params))
+    }
+
+    #[inline(always)]
+    fn get_type_name() -> Option<&'static str> {
+        None
     }
 }

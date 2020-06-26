@@ -5,7 +5,7 @@ authors = ["Ivan Kalinin <i.kalinin@dexpa.io>"]
 edition = "2018"
 
 [dependencies]
-opg = { path = "../opg" }
+opg = { path = "../opg", features = [ "uuid", "chrono" ] }
 
 [dev-dependencies]
 serde = "1.0"

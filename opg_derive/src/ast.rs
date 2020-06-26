@@ -1,4 +1,4 @@
-use itertools::*;
+use either::*;
 use syn::punctuated::Punctuated;
 
 use crate::attr;

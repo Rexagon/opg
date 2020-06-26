@@ -355,7 +355,7 @@ required:
 
     #[derive(Serialize, OpgModel)]
     struct Recursive {
-        recursive_field: Option<NewType>,
+        recursive_field: Option<Box<Recursive>>,
     }
 
     fn test_recursive() {

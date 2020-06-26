@@ -1,6 +1,7 @@
 use std::collections::{btree_map::Entry, BTreeMap};
 use std::fmt::Write;
 
+use either::*;
 use serde::ser::{SerializeMap, SerializeSeq};
 use serde::{Serialize, Serializer};
 
@@ -108,8 +109,8 @@ where
     let mut result = String::new();
 
     for element in elements.iter().map(|element| match element {
-        OpgPathElement::Path(path) => itertools::Either::Left(path),
-        OpgPathElement::Parameter(param) => itertools::Either::Right(format!("{{{}}}", param)),
+        OpgPathElement::Path(path) => Either::Left(path),
+        OpgPathElement::Parameter(param) => Either::Right(format!("{{{}}}", param)),
     }) {
         write!(&mut result, "/{}", element).unwrap();
     }
