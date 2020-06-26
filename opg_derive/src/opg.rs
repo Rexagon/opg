@@ -54,6 +54,7 @@ fn serialize_enum(container: &Container, variants: &[Variant]) -> proc_macro2::T
 
 fn serialize_newtype_enum(container: &Container, variants: &[Variant]) -> proc_macro2::TokenStream {
     let description = option_string(container.attrs.description.as_deref());
+    let nullable = container.attrs.nullable;
 
     let body = if container.attrs.has_repr {
         let variants = variants
@@ -73,10 +74,13 @@ fn serialize_newtype_enum(container: &Container, variants: &[Variant]) -> proc_m
                 quote! {
                     _opg::Model {
                         description: Some(#description.to_owned()),
-                        data: _opg::ModelData::Single(_opg::ModelTypeDescription::Integer(_opg::ModelSimple {
-                            format: None,
-                            example: Some(#example.to_owned()),
-                        })),
+                        data: _opg::ModelData::Single(_opg::ModelType {
+                            nullable: #nullable,
+                            type_description: _opg::ModelTypeDescription::Integer(_opg::ModelSimple {
+                                format: None,
+                                example: Some(#example.to_owned()),
+                            })
+                        }),
                     }
                 }
             })
@@ -103,13 +107,16 @@ fn serialize_newtype_enum(container: &Container, variants: &[Variant]) -> proc_m
         quote! {
             _opg::Model {
                 description: #description,
-                data: _opg::ModelData::Single(_opg::ModelTypeDescription::String(_opg::ModelString {
-                    variants: Some(vec![#(#variants.to_owned()),*]),
-                    data: _opg::ModelSimple {
-                        format: None,
-                        example: #example,
-                    }
-                }))
+                data: _opg::ModelData::Single(_opg::ModelType {
+                    nullable: #nullable,
+                    type_description: _opg::ModelTypeDescription::String(_opg::ModelString {
+                        variants: Some(vec![#(#variants.to_owned()),*]),
+                        data: _opg::ModelSimple {
+                            format: None,
+                            example: #example,
+                        }
+                    })
+                })
             }
         }
     };
@@ -134,6 +141,7 @@ fn serialize_untagged_enum(
                 field_model_reference(context_params, field, variant.attrs.inline)
             }
             StructStyle::Struct => inline_reference(object_model(
+                false,
                 &variant.attrs.description,
                 &variant.fields,
                 |field| variant.attrs.inline || field.attrs.inline,
@@ -161,6 +169,7 @@ fn serialize_adjacent_tagged_enum(
     content: &str,
 ) -> proc_macro2::TokenStream {
     let description = option_string(container.attrs.description.as_deref());
+    let nullable = container.attrs.nullable;
 
     let (variants, one_of) = variants
         .iter()
@@ -178,11 +187,13 @@ fn serialize_adjacent_tagged_enum(
                         field_model_reference(context_params, field, variant.attrs.inline)
                     }
                     StructStyle::Tuple => inline_reference(tuple_model(
+                        false,
                         &variant.attrs.description,
                         &variant.fields,
                         |field| variant.attrs.inline || field.attrs.inline,
                     )),
                     StructStyle::Struct => inline_reference(tuple_model(
+                        false,
                         &variant.attrs.description,
                         &variant.fields,
                         |field| field.attrs.inline || variant.attrs.inline,
@@ -207,13 +218,16 @@ fn serialize_adjacent_tagged_enum(
             properties.insert(#tag.to_owned(), _opg::ModelReference::Inline(
                 _opg::Model {
                     description: Some(format!("{} type variant", #type_name_stringified)),
-                    data: _opg::ModelData::Single(_opg::ModelTypeDescription::String(_opg::ModelString {
-                        variants: Some(vec![#(#variants.to_owned()),*]),
-                        data: _opg::ModelSimple {
-                            format: None,
-                            example: #type_example,
-                        }
-                    }))
+                    data: _opg::ModelData::Single(_opg::ModelType {
+                        nullable: false,
+                        type_description: _opg::ModelTypeDescription::String(_opg::ModelString {
+                            variants: Some(vec![#(#variants.to_owned()),*]),
+                            data: _opg::ModelSimple {
+                                format: None,
+                                example: #type_example,
+                            }
+                        })
+                    })
                 }
             ));
             required.push(#tag.to_owned());
@@ -241,7 +255,10 @@ fn serialize_adjacent_tagged_enum(
     let body = quote! {
         _opg::Model {
             description: #description,
-            data: _opg::ModelData::Single(#struct_type_description)
+            data: _opg::ModelData::Single(_opg::ModelType {
+                nullable: #nullable,
+                type_description: #struct_type_description
+            })
         }
     };
 
@@ -253,6 +270,7 @@ fn serialize_external_tagged_enum(
     variants: &[Variant],
 ) -> proc_macro2::TokenStream {
     let description = option_string(container.attrs.description.as_deref());
+    let nullable = container.attrs.nullable;
 
     let (_, one_of) = variants
         .iter()
@@ -270,13 +288,16 @@ fn serialize_external_tagged_enum(
                             _opg::ModelReference::Inline(
                                 _opg::Model {
                                     description: #description,
-                                    data: _opg::ModelData::Single(_opg::ModelTypeDescription::String(_opg::ModelString {
-                                        variants: Some(vec![#variant_name.to_owned()]),
-                                        data: _opg::ModelSimple {
-                                            format: None,
-                                            example: #variant_name.to_owned(),
-                                        }
-                                    }))
+                                    data: _opg::ModelData::Single(_opg::ModelType {
+                                        nullable: false,
+                                        type_description: _opg::ModelTypeDescription::String(_opg::ModelString {
+                                            variants: Some(vec![#variant_name.to_owned()]),
+                                            data: _opg::ModelSimple {
+                                                format: None,
+                                                example: #variant_name.to_owned(),
+                                            }
+                                        })
+                                    })
                                 }
                             )
                         }
@@ -292,12 +313,12 @@ fn serialize_external_tagged_enum(
                         )
                     },
                     StructStyle::Tuple => {
-                        inline_reference(tuple_model(
+                        inline_reference(tuple_model(false,
                             &variant.attrs.description, &variant.fields, |field| {
                             variant.attrs.inline || field.attrs.inline
                         }))
                     }
-                    StructStyle::Struct => inline_reference(object_model(
+                    StructStyle::Struct => inline_reference(object_model(false,
                         &variant.attrs.description,
                         &variant.fields,
                         |field| {
@@ -315,19 +336,22 @@ fn serialize_external_tagged_enum(
     let body = quote! {
         _opg::Model {
             description: #description,
-            data: _opg::ModelData::Single(_opg::ModelTypeDescription::Object(
-                _opg::ModelObject {
-                    additional_properties: Some(Box::new(_opg::ModelReference::Inline(
-                        _opg::Model {
-                            description: #description,
-                            data: _opg::ModelData::OneOf(_opg::ModelOneOf {
-                                one_of: vec![#(#one_of),*],
-                            })
-                        }
-                    ))),
-                    ..Default::default()
-                }
-            ))
+            data: _opg::ModelData::Single(_opg::ModelType {
+                nullable: #nullable,
+                type_description: _opg::ModelTypeDescription::Object(
+                    _opg::ModelObject {
+                        additional_properties: Some(Box::new(_opg::ModelReference::Inline(
+                            _opg::Model {
+                                description: #description,
+                                data: _opg::ModelData::OneOf(_opg::ModelOneOf {
+                                    one_of: vec![#(#one_of),*],
+                                })
+                            }
+                        ))),
+                        ..Default::default()
+                    }
+                )
+            })
         }
     };
 
@@ -340,6 +364,7 @@ fn serialize_internal_tagged_enum(
     tag: &str,
 ) -> proc_macro2::TokenStream {
     let description = option_string(container.attrs.description.as_deref());
+    let nullable = container.attrs.nullable;
 
     let type_name_stringified = container.ident.to_string();
 
@@ -360,7 +385,7 @@ fn serialize_internal_tagged_enum(
                     }
                 }
                 StructStyle::Struct => {
-                    object_model(&variant.attrs.description, &variant.fields, |field| {
+                    object_model(false, &variant.attrs.description, &variant.fields, |field| {
                         variant.attrs.inline || field.attrs.inline
                     })
                 }
@@ -377,13 +402,16 @@ fn serialize_internal_tagged_enum(
                         properties.insert(#tag.to_owned(), _opg::ModelReference::Inline(
                             _opg::Model {
                                 description: Some(format!("{} type variant", #type_name_stringified)),
-                                data: _opg::ModelData::Single(_opg::ModelTypeDescription::String(_opg::ModelString {
-                                    variants: Some(vec![#variant_name.to_owned()]),
-                                    data: _opg::ModelSimple {
-                                        format: None,
-                                        example: Some(#variant_name.to_owned()),
-                                    }
-                                }))
+                                data: _opg::ModelData::Single(_opg::ModelType {
+                                    nullable: false,
+                                    type_description: _opg::ModelTypeDescription::String(_opg::ModelString {
+                                        variants: Some(vec![#variant_name.to_owned()]),
+                                        data: _opg::ModelSimple {
+                                            format: None,
+                                            example: Some(#variant_name.to_owned()),
+                                        }
+                                    })
+                                })
                             }
                         ));
 
@@ -396,7 +424,10 @@ fn serialize_internal_tagged_enum(
 
                     let _ = model.try_merge(_opg::Model {
                         description: None,
-                        data: _opg::ModelData::Single(additional_object)
+                        data: _opg::ModelData::Single(_opg::ModelType {
+                            nullable: #nullable,
+                            type_description: additional_object
+                        })
                     });
 
                     _opg::ModelReference::Inline(model)
@@ -419,13 +450,17 @@ fn serialize_internal_tagged_enum(
 
 fn serialize_struct(container: &Container, fields: &[Field]) -> proc_macro2::TokenStream {
     let description = option_string(container.attrs.description.as_deref());
+    let nullable = container.attrs.nullable;
 
     let object_type_description = object_type_description(fields, |field| field.attrs.inline);
 
     let body = quote! {
         _opg::Model {
             description: #description,
-            data: _opg::ModelData::Single(#object_type_description)
+            data: _opg::ModelData::Single(_opg::ModelType {
+                nullable: #nullable,
+                type_description: #object_type_description
+            })
         }
     };
 
@@ -434,13 +469,17 @@ fn serialize_struct(container: &Container, fields: &[Field]) -> proc_macro2::Tok
 
 fn serialize_tuple_struct(container: &Container, fields: &[Field]) -> proc_macro2::TokenStream {
     let description = option_string(container.attrs.description.as_deref());
+    let nullable = container.attrs.nullable;
 
     let tuple_type_description = tuple_type_description(fields, |field| field.attrs.inline);
 
     let body = quote! {
         _opg::Model {
             description: #description,
-            data: _opg::ModelData::Single(#tuple_type_description)
+            data: _opg::ModelData::Single(_opg::ModelType {
+                nullable: #nullable,
+                type_description: #tuple_type_description
+            })
         }
     };
 
@@ -453,7 +492,11 @@ fn serialize_newtype_struct(container: &Container, field: &Field) -> proc_macro2
     let context_params = ContextParams::from(&field.attrs).or(&container.attrs);
 
     let body = match container.attrs.explicit_model_type {
-        Some(explicit_model_type) => newtype_model(context_params, explicit_model_type),
+        Some(explicit_model_type) => newtype_model(
+            container.attrs.nullable,
+            context_params,
+            explicit_model_type,
+        ),
         None => {
             let context_params = context_params.tokenize();
 
@@ -467,6 +510,7 @@ fn serialize_newtype_struct(container: &Container, field: &Field) -> proc_macro2
 }
 
 fn tuple_model<P>(
+    nullable: bool,
     description: &Option<String>,
     fields: &[Field],
     inline_predicate: P,
@@ -480,12 +524,16 @@ where
     quote! {
         _opg::Model {
             description: #description,
-            data: _opg::ModelData::Single(#tuple_type_description)
+            data: _opg::ModelData::Single(_opg::ModelType {
+                nullable: #nullable,
+                type_description: #tuple_type_description
+            })
         }
     }
 }
 
 fn object_model<P>(
+    nullable: bool,
     description: &Option<String>,
     fields: &[Field],
     inline_predicate: P,
@@ -499,7 +547,10 @@ where
     quote! {
         _opg::Model {
             description: #description,
-            data: _opg::ModelData::Single(#object_type_description)
+            data: _opg::ModelData::Single(_opg::ModelType {
+                nullable: #nullable,
+                type_description: #object_type_description
+            })
         }
     }
 }
@@ -599,7 +650,7 @@ fn field_model_reference<'a>(
 
     match field.attrs.explicit_model_type {
         Some(explicit_model_type) => {
-            let model = newtype_model(context_params, explicit_model_type);
+            let model = newtype_model(field.attrs.nullable, context_params, explicit_model_type);
 
             quote! {
                 _opg::ModelReference::Inline(#model)
@@ -619,6 +670,7 @@ fn field_model_reference<'a>(
 }
 
 fn newtype_model(
+    nullable: bool,
     context_params: ContextParams,
     explicit_model_type: ExplicitModelType,
 ) -> proc_macro2::TokenStream {
@@ -655,7 +707,10 @@ fn newtype_model(
     quote! {
         _opg::Model {
             description: #description,
-            data: _opg::ModelData::Single(#data),
+            data: _opg::ModelData::Single(_opg::ModelType {
+                nullable: #nullable,
+                type_description: #data
+            }),
         }
     }
 }
@@ -663,8 +718,16 @@ fn newtype_model(
 fn option_string(data: Option<&str>) -> proc_macro2::TokenStream {
     match data {
         Some(data) => {
-            let string = syn::LitStr::new(data, Span::call_site());
-            quote! { Some(#string.to_owned()) }
+            quote! { Some(#data.to_owned()) }
+        }
+        None => quote! { None },
+    }
+}
+
+fn option_bool(data: Option<bool>) -> proc_macro2::TokenStream {
+    match data {
+        Some(data) => {
+            quote! { Some(#data) }
         }
         None => quote! { None },
     }
@@ -705,6 +768,7 @@ fn implement_type(
 #[derive(Default, Copy, Clone)]
 struct ContextParams<'a> {
     description: Option<&'a str>,
+    nullable: Option<bool>,
     format: Option<&'a str>,
     example: Option<&'a str>,
 }
@@ -713,6 +777,7 @@ impl<'a> From<&'a attr::Container> for ContextParams<'a> {
     fn from(attrs: &'a attr::Container) -> Self {
         Self::new()
             .description(attrs.description.as_deref())
+            .nullable(if attrs.nullable { Some(true) } else { None })
             .format(attrs.format.as_deref())
             .example(attrs.example.as_deref())
     }
@@ -731,6 +796,7 @@ impl<'a> From<&'a attr::Field> for ContextParams<'a> {
     fn from(attrs: &'a attr::Field) -> Self {
         Self::new()
             .description(attrs.description.as_deref())
+            .nullable(if attrs.nullable { Some(true) } else { None })
             .format(attrs.format.as_deref())
             .example(attrs.example.as_deref())
     }
@@ -743,6 +809,11 @@ impl<'a> ContextParams<'a> {
 
     fn description(mut self, description: Option<&'a str>) -> Self {
         self.description = description;
+        self
+    }
+
+    fn nullable(mut self, nullable: Option<bool>) -> Self {
+        self.nullable = nullable;
         self
     }
 
@@ -783,12 +854,14 @@ impl<'a> ContextParams<'a> {
 
     fn tokenize(self) -> proc_macro2::TokenStream {
         let description = option_string(self.description);
+        let nullable = option_bool(self.nullable);
         let format = option_string(self.format);
         let example = option_string(self.example);
 
         quote! {
             _opg::ContextParams {
                 description: #description,
+                nullable: #nullable,
                 variants: None,
                 format: #format,
                 example: #example,

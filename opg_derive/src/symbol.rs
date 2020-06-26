@@ -26,6 +26,7 @@ define_symbols! {
 
     INLINE => "inline",
     OPTIONAL => "optional",
+    NULLABLE => "nullable",
 
     // serde
     SERDE => "serde",

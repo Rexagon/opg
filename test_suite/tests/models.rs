@@ -263,7 +263,6 @@ items:
 
     #[derive(Serialize, OpgModel)]
     struct StructWithInner {
-        #[opg(optional)]
         field: Option<String>,
         #[opg(optional)]
         super_optional: Option<Option<String>>,
@@ -278,12 +277,16 @@ items:
 type: object
 properties:
   boxed:
+    nullable: true
     type: integer
   field:
+    nullable: true
     type: string
   super_optional:
+    nullable: true
     type: string
 required:
+  - field
   - boxed"##
         );
     }
@@ -300,42 +303,82 @@ additionalProperties:
         );
     }
 
+    #[derive(Serialize, OpgModel)]
+    struct NullableNewtype(Option<i32>);
+
+    #[test]
+    fn test_nullable_newtype() {
+        assert_eq!(
+            serde_yaml::to_string(&NullableNewtype::get_structure()).unwrap(),
+            r##"---
+nullable: true
+type: integer"##
+        );
+    }
+
+    #[derive(Serialize, OpgModel)]
+    struct StructWithNullable {
+        #[opg(nullable)]
+        field: i32,
+    }
+
+    #[test]
+    fn test_nullable_field() {
+        assert_eq!(
+            serde_yaml::to_string(&StructWithNullable::get_structure()).unwrap(),
+            r##"---
+type: object
+properties:
+  field:
+    nullable: true
+    type: integer
+required:
+  - field"##
+        );
+    }
+
     #[test]
     fn test_serialization() {
         let model = Model {
             description: Some("Some type".to_owned()),
-            data: ModelData::Single(ModelTypeDescription::Object(ModelObject {
-                properties: {
-                    let mut properties = std::collections::BTreeMap::new();
-                    properties.insert(
-                        "id".to_owned(),
-                        ModelReference::Link("TransactionId".to_owned()),
-                    );
-                    properties.insert(
-                        "amount".to_owned(),
-                        ModelReference::Inline(Model {
-                            description: None,
-                            data: ModelData::Single(ModelTypeDescription::String(ModelString {
-                                variants: None,
-                                data: ModelSimple {
-                                    format: None,
-                                    example: None,
-                                },
-                            })),
-                        }),
-                    );
+            data: ModelData::Single(ModelType {
+                nullable: false,
+                type_description: ModelTypeDescription::Object(ModelObject {
+                    properties: {
+                        let mut properties = std::collections::BTreeMap::new();
+                        properties.insert(
+                            "id".to_owned(),
+                            ModelReference::Link("TransactionId".to_owned()),
+                        );
+                        properties.insert(
+                            "amount".to_owned(),
+                            ModelReference::Inline(Model {
+                                description: None,
+                                data: ModelData::Single(ModelType {
+                                    nullable: false,
+                                    type_description: ModelTypeDescription::String(ModelString {
+                                        variants: None,
+                                        data: ModelSimple {
+                                            format: None,
+                                            example: None,
+                                        },
+                                    }),
+                                }),
+                            }),
+                        );
 
-                    properties
-                },
-                additional_properties: Default::default(),
-                required: vec![
-                    "id".to_owned(),
-                    "amount".to_owned(),
-                    "currency".to_owned(),
-                    "paymentType".to_owned(),
-                    "status".to_owned(),
-                ],
-            })),
+                        properties
+                    },
+                    additional_properties: Default::default(),
+                    required: vec![
+                        "id".to_owned(),
+                        "amount".to_owned(),
+                        "currency".to_owned(),
+                        "paymentType".to_owned(),
+                        "status".to_owned(),
+                    ],
+                }),
+            }),
         };
 
         assert_eq!(

@@ -38,13 +38,16 @@ macro_rules! describe_type(
     }) => {
         $crate::Model {
             description: $crate::macros::FromStrangeTuple::extract(($($description.to_string(),)?)),
-            data: $crate::ModelData::Single($crate::ModelTypeDescription::String($crate::ModelString {
-                variants: $crate::macros::FromStrangeTuple::extract(($(vec![$($variants.to_string()),*],)?)),
-                data: ModelSimple {
-                    format: $crate::macros::FromStrangeTuple::extract(($($format.to_string(),)?)),
-                    example: $crate::macros::FromStrangeTuple::extract(($($example.to_string(),)?)),
-                }
-            }))
+            data: $crate::ModelData::Single($crate::ModelType {
+                nullable: false,
+                type_description: $crate::ModelTypeDescription::String($crate::ModelString {
+                    variants: $crate::macros::FromStrangeTuple::extract(($(vec![$($variants.to_string()),*],)?)),
+                    data: ModelSimple {
+                        format: $crate::macros::FromStrangeTuple::extract(($($format.to_string(),)?)),
+                        example: $crate::macros::FromStrangeTuple::extract(($($example.to_string(),)?)),
+                    }
+                })
+            })
         }
     };
 
@@ -55,10 +58,13 @@ macro_rules! describe_type(
     }) => {
         $crate::Model {
             description: $crate::macros::FromStrangeTuple::extract(($($description.to_string(),)?)),
-            data: $crate::ModelData::Single($crate::ModelTypeDescription::Number($crate::ModelSimple {
-                format: $crate::macros::FromStrangeTuple::extract(($($format.to_string(),)?)),
-                example: $crate::macros::FromStrangeTuple::extract(($($example.to_string(),)?)),
-            }))
+            data: $crate::ModelData::Single($crate::ModelType {
+                nullable: false,
+                type_description: $crate::ModelTypeDescription::Number($crate::ModelSimple {
+                    format: $crate::macros::FromStrangeTuple::extract(($($format.to_string(),)?)),
+                    example: $crate::macros::FromStrangeTuple::extract(($($example.to_string(),)?)),
+                })
+            })
         }
     };
 
@@ -69,10 +75,13 @@ macro_rules! describe_type(
     }) => {
         $crate::Model {
             description: $crate::macros::FromStrangeTuple::extract(($($description.to_string(),)?)),
-            data: $crate::ModelData::Single($crate::ModelTypeDescription::Integer($crate::ModelSimple {
-                format: $crate::macros::FromStrangeTuple::extract(($($format.to_string(),)?)),
-                example: $crate::macros::FromStrangeTuple::extract(($($example.to_string(),)?)),
-            }))
+            data: $crate::ModelData::Single($crate::ModelType {
+                nullable: false,
+                type_description: $crate::ModelTypeDescription::Integer($crate::ModelSimple {
+                    format: $crate::macros::FromStrangeTuple::extract(($($format.to_string(),)?)),
+                    example: $crate::macros::FromStrangeTuple::extract(($($example.to_string(),)?)),
+                })
+            })
         }
     };
 
@@ -81,7 +90,10 @@ macro_rules! describe_type(
     }) => {
         $crate::Model {
             description: $crate::macros::FromStrangeTuple::extract(($($description.to_string(),)?)),
-            data: $crate::ModelData::Single($crate::ModelTypeDescription::Boolean)
+            data: $crate::ModelData::Single($crate::ModelType {
+                nullable: false,
+                type_description: $crate::ModelTypeDescription::Boolean
+            })
         }
     };
 
@@ -91,9 +103,12 @@ macro_rules! describe_type(
     }) => {
         $crate::Model {
             description: $crate::macros::FromStrangeTuple::extract(($($description.to_string(),)?)),
-            data: $crate::ModelData::Single($crate::ModelTypeDescription::Array($crate::ModelArray {
-                items: Box::new(describe_type!(@object_property_value $($property_tail)*))
-            }))
+            data: $crate::ModelData::Single($crate::ModelType {
+                nullable: false,
+                type_description: $crate::ModelTypeDescription::Array($crate::ModelArray {
+                    items: Box::new(describe_type!(@object_property_value $($property_tail)*))
+                })
+            })
         }
     };
 
@@ -111,11 +126,14 @@ macro_rules! describe_type(
 
         $crate::Model {
             description: $crate::macros::FromStrangeTuple::extract(($($description.to_string(),)?)),
-            data: $crate::ModelData::Single($crate::ModelTypeDescription::Object($crate::ModelObject {
-                properties,
-                required,
-                ..Default::default()
-            }))
+            data: $crate::ModelData::Single($crate::ModelType {
+                nullable: false,
+                type_description: $crate::ModelTypeDescription::Object($crate::ModelObject {
+                    properties,
+                    required,
+                    ..Default::default()
+                })
+            })
         }
     }};
 
@@ -144,6 +162,20 @@ macro_rules! describe_type(
 
 #[macro_export]
 macro_rules! impl_opg_model(
+    (generic_simple(nullable): $($type:tt)+) => {
+        impl<T> $crate::OpgModel for $($type)+
+        where
+            T: $crate::OpgModel,
+        {
+            fn get_structure() -> $crate::Model {
+                <T as $crate::OpgModel>::get_structure_with_params(&$crate::ContextParams {
+                    nullable: Some(true),
+                    ..Default::default()
+                })
+            }
+        }
+    };
+
     (generic_simple: $($type:tt)+) => {
         impl<T> $crate::OpgModel for $($type)+
         where
@@ -189,9 +221,12 @@ macro_rules! impl_opg_model(
             fn get_structure() -> $crate::Model {
                 Model {
                     description: None,
-                    data: $crate::ModelData::Single($crate::ModelTypeDescription::Array($crate::ModelArray {
-                        items: Box::new($crate::ModelReference::Inline(<T as $crate::OpgModel>::get_structure())),
-                    })),
+                    data: $crate::ModelData::Single($crate::ModelType {
+                        nullable: false,
+                        type_description: $crate::ModelTypeDescription::Array($crate::ModelArray {
+                            items: Box::new($crate::ModelReference::Inline(<T as $crate::OpgModel>::get_structure())),
+                        })
+                    }),
                 }
             }
 
@@ -211,13 +246,16 @@ macro_rules! impl_opg_model(
             fn get_structure() -> $crate::Model {
                 Model {
                     description: None,
-                    data: $crate::ModelData::Single($crate::ModelTypeDescription::Object($crate::ModelObject {
-                        additional_properties: Some(Box::new(<T as $crate::OpgModel>::select_reference(
-                            false,
-                            &$crate::ContextParams::default(),
-                        ))),
-                        ..Default::default()
-                    })),
+                    data: $crate::ModelData::Single($crate::ModelType {
+                        nullable: false,
+                        type_description: $crate::ModelTypeDescription::Object($crate::ModelObject {
+                            additional_properties: Some(Box::new(<T as $crate::OpgModel>::select_reference(
+                                false,
+                                &$crate::ContextParams::default(),
+                            ))),
+                            ..Default::default()
+                        })
+                    }),
                 }
             }
         }

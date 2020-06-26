@@ -23,6 +23,7 @@ pub struct Container {
     pub format: Option<String>,
     pub example: Option<String>,
     pub inline: bool,
+    pub nullable: bool,
     pub explicit_model_type: Option<ExplicitModelType>,
     pub model_type: ModelType,
 }
@@ -42,6 +43,7 @@ impl Container {
         let mut format = Attr::none(cx, FORMAT);
         let mut example = Attr::none(cx, EXAMPLE);
         let mut inline = BoolAttr::none(cx, INLINE);
+        let mut nullable = BoolAttr::none(cx, NULLABLE);
         let mut model_type = OneOfFlagsAttr::none(cx);
 
         for (from, meta_item) in input
@@ -121,6 +123,7 @@ impl Container {
                     }
                 }
                 (AttrFrom::Opg, Meta(Path(word))) if word == INLINE => inline.set_true(word),
+                (AttrFrom::Opg, Meta(Path(word))) if word == NULLABLE => nullable.set_true(word),
                 (AttrFrom::Opg, Meta(Path(word))) => {
                     if let Ok(t) = ExplicitModelType::from_path(word) {
                         model_type.set(word, t);
@@ -160,6 +163,7 @@ impl Container {
             format: format.get(),
             example: example.get(),
             inline: inline.get(),
+            nullable: nullable.get(),
             explicit_model_type,
             model_type,
         }
@@ -291,6 +295,7 @@ pub struct Field {
     pub format: Option<String>,
     pub example: Option<String>,
     pub inline: bool,
+    pub nullable: bool,
     pub explicit_model_type: Option<ExplicitModelType>,
 }
 
@@ -306,6 +311,7 @@ impl Field {
         let mut format = Attr::none(cx, FORMAT);
         let mut example = Attr::none(cx, EXAMPLE);
         let mut inline = BoolAttr::none(cx, INLINE);
+        let mut nullable = BoolAttr::none(cx, NULLABLE);
         let mut model_type = OneOfFlagsAttr::none(cx);
 
         let ident = match &input.ident {
@@ -359,6 +365,7 @@ impl Field {
                 }
                 (AttrFrom::Opg, Meta(Path(word))) if word == OPTIONAL => optional.set_true(word),
                 (AttrFrom::Opg, Meta(Path(word))) if word == INLINE => inline.set_true(word),
+                (AttrFrom::Opg, Meta(Path(word))) if word == NULLABLE => nullable.set_true(word),
                 (AttrFrom::Opg, Meta(Path(word))) => {
                     if let Ok(t) = ExplicitModelType::from_path(word) {
                         model_type.set(word, t);
@@ -391,6 +398,7 @@ impl Field {
             format: format.get(),
             example: example.get(),
             inline: inline.get(),
+            nullable: nullable.get(),
             explicit_model_type: model_type.at_most_one(),
         }
     }

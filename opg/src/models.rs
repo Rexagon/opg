@@ -418,6 +418,7 @@ pub enum InjectReference<'a> {
 #[derive(Default)]
 pub struct ContextParams {
     pub description: Option<String>,
+    pub nullable: Option<bool>,
     pub variants: Option<Vec<String>>,
     pub format: Option<String>,
     pub example: Option<String>,
@@ -448,10 +449,14 @@ impl Model {
 
     pub fn try_merge(&mut self, other: Model) -> Result<(), ()> {
         match &mut self.data {
-            ModelData::Single(ModelTypeDescription::Object(self_object)) => match other.data {
-                ModelData::Single(ModelTypeDescription::Object(other_object)) => {
-                    self_object.merge(other_object)
-                }
+            ModelData::Single(ModelType {
+                type_description: ModelTypeDescription::Object(self_object),
+                ..
+            }) => match other.data {
+                ModelData::Single(ModelType {
+                    type_description: ModelTypeDescription::Object(other_object),
+                    ..
+                }) => self_object.merge(other_object),
                 _ => Err(()),
             },
             _ => Err(()),
@@ -462,7 +467,7 @@ impl Model {
 #[derive(Debug, Clone, Serialize)]
 #[serde(untagged, rename_all = "camelCase")]
 pub enum ModelData {
-    Single(ModelTypeDescription),
+    Single(ModelType),
     OneOf(ModelOneOf),
 }
 
@@ -496,6 +501,34 @@ impl ModelOneOf {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelType {
+    #[serde(skip_serializing_if = "is_false")]
+    pub nullable: bool,
+    #[serde(flatten)]
+    pub type_description: ModelTypeDescription,
+}
+
+impl ModelType {
+    #[inline(always)]
+    pub fn apply_params(mut self, params: &ContextParams) -> Self {
+        if let Some(nullable) = params.nullable {
+            self.nullable = nullable;
+        }
+        self.type_description = self.type_description.apply_params(params);
+        self
+    }
+
+    fn traverse<'a>(&'a self, cx: TraverseContext<'a>) -> Result<(), &'a str> {
+        match &self.type_description {
+            ModelTypeDescription::Array(array) => array.traverse(cx),
+            ModelTypeDescription::Object(object) => object.traverse(cx),
+            _ => Ok(()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum ModelTypeDescription {
     String(ModelString),
@@ -520,14 +553,6 @@ impl ModelTypeDescription {
                 ModelTypeDescription::Integer(integer.apply_params(params))
             }
             other => other,
-        }
-    }
-
-    fn traverse<'a>(&'a self, cx: TraverseContext<'a>) -> Result<(), &'a str> {
-        match self {
-            ModelTypeDescription::Array(array) => array.traverse(cx),
-            ModelTypeDescription::Object(object) => object.traverse(cx),
-            _ => Ok(()),
         }
     }
 }
