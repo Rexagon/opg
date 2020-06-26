@@ -41,9 +41,7 @@ mod tests {
             paths: {
                 ("test"): {
                     POST: {
-                        body: {
-                            schema: request::InModule,
-                        }
+                        body: request::InModule,
                         200("Ok"): std::vec::Vec<String>,
                     }
                 },

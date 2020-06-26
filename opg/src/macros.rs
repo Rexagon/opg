@@ -423,6 +423,14 @@ macro_rules! describe_api {
         });
         describe_api!(@opg_path_value_operation_properties $components $context $($other)*)
     };
+    (@opg_path_value_operation_properties $components:ident $context:ident $(,)? body: $type:path, $($other:tt)*) => {
+        $context.request_body = Some($crate::models::OpgRequestBody {
+           description: Some(String::new()),
+           required: true,
+           schema: $components.mention::<$type>(false, &Default::default()),
+        });
+        describe_api!(@opg_path_value_operation_properties $components $context $($other)*)
+    };
     (@opg_path_value_operation_properties $components:ident $context:ident $(,)? $response:literal($description:literal): $type:path, $($other:tt)*) => {
         $context.responses.insert($response, $crate::models::OpgResponse {
             description: $description.to_owned(),
