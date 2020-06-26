@@ -173,6 +173,11 @@ macro_rules! impl_opg_model(
                     ..Default::default()
                 })
             }
+
+            #[inline(always)]
+            fn get_type_name() -> Option<&'static str> {
+                <T as $crate::OpgModel>::get_type_name()
+            }
         }
     };
 
@@ -183,6 +188,11 @@ macro_rules! impl_opg_model(
         {
             fn get_structure() -> $crate::Model {
                 <T as $crate::OpgModel>::get_structure()
+            }
+
+            #[inline(always)]
+            fn get_type_name() -> Option<&'static str> {
+                <T as $crate::OpgModel>::get_type_name()
             }
         }
     };
@@ -209,6 +219,16 @@ macro_rules! impl_opg_model(
                     items: (raw_model => item_model)
                 })
             }
+
+            #[inline(always)]
+            fn select_reference(_: bool, inline_params: &ContextParams) -> $crate::ModelReference {
+                Self::inject(InjectReference::Inline(inline_params))
+            }
+
+            #[inline(always)]
+            fn get_type_name() -> Option<&'static str> {
+                None
+            }
         }
     };
 
@@ -234,6 +254,11 @@ macro_rules! impl_opg_model(
             fn select_reference(_: bool, inline_params: &ContextParams) -> $crate::ModelReference {
                 Self::inject(InjectReference::Inline(inline_params))
             }
+
+            #[inline(always)]
+            fn get_type_name() -> Option<&'static str> {
+                None
+            }
         }
     };
 
@@ -258,6 +283,16 @@ macro_rules! impl_opg_model(
                     }),
                 }
             }
+
+            #[inline(always)]
+            fn select_reference(_: bool, inline_params: &ContextParams) -> $crate::ModelReference {
+                Self::inject(InjectReference::Inline(inline_params))
+            }
+
+            #[inline(always)]
+            fn get_type_name() -> Option<&'static str> {
+                None
+            }
         }
     };
 
@@ -265,6 +300,11 @@ macro_rules! impl_opg_model(
         impl $crate::OpgModel for $($type)+ {
             fn get_structure() -> Model {
                 describe_type!($serialized_type => {})
+            }
+
+            #[inline(always)]
+            fn get_type_name() -> Option<&'static str> {
+                <T as $crate::OpgModel>::get_type_name()
             }
         }
     };
@@ -277,6 +317,11 @@ macro_rules! impl_opg_model(
 
             fn select_reference(_: bool, inline_params: &ContextParams) -> ModelReference {
                 Self::inject(InjectReference::Inline(inline_params))
+            }
+
+            #[inline(always)]
+            fn get_type_name() -> Option<&'static str> {
+                None
             }
         }
     };

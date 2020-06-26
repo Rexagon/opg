@@ -382,10 +382,7 @@ impl OpgComponents {
 pub trait OpgModel {
     fn get_structure() -> Model;
 
-    #[inline(always)]
-    fn get_type_name() -> Option<&'static str> {
-        None
-    }
+    fn get_type_name() -> Option<&'static str>;
 
     fn get_structure_with_params(params: &ContextParams) -> Model {
         Self::get_structure().apply_params(params)

@@ -741,6 +741,11 @@ fn implement_type(
     let inline = if inline {
         quote! {
             #[inline(always)]
+            fn get_type_name() -> Option<&'static str> {
+                None
+            }
+
+            #[inline(always)]
             fn select_reference(_: bool, inline_params: &_opg::ContextParams) -> _opg::ModelReference {
                 Self::inject(_opg::InjectReference::Inline(inline_params))
             }
