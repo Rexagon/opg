@@ -54,7 +54,6 @@ fn serialize_enum(container: &Container, variants: &[Variant]) -> proc_macro2::T
 
 fn serialize_newtype_enum(container: &Container, variants: &[Variant]) -> proc_macro2::TokenStream {
     let description = option_string(container.attrs.description.as_deref());
-    let nullable = container.attrs.nullable;
 
     let body = if container.attrs.has_repr {
         let variants = variants
@@ -75,7 +74,7 @@ fn serialize_newtype_enum(container: &Container, variants: &[Variant]) -> proc_m
                     _opg::Model {
                         description: Some(#description.to_owned()),
                         data: _opg::ModelData::Single(_opg::ModelType {
-                            nullable: #nullable,
+                            nullable: false,
                             type_description: _opg::ModelTypeDescription::Integer(_opg::ModelSimple {
                                 format: None,
                                 example: Some(#example.to_owned()),
@@ -108,7 +107,7 @@ fn serialize_newtype_enum(container: &Container, variants: &[Variant]) -> proc_m
             _opg::Model {
                 description: #description,
                 data: _opg::ModelData::Single(_opg::ModelType {
-                    nullable: #nullable,
+                    nullable: false,
                     type_description: _opg::ModelTypeDescription::String(_opg::ModelString {
                         variants: Some(vec![#(#variants.to_owned()),*]),
                         data: _opg::ModelSimple {

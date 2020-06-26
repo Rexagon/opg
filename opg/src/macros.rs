@@ -448,26 +448,57 @@ macro_rules! describe_api {
     (@opg_path_value_body_properties $components:ident $description:ident $required:ident $schema:ident $(,)?) => {};
 
 
-    (@opg_path_value_parameters $components:ident $context:ident (header $name:literal): { $($properties:tt)* } $($other:tt)*) => {{
-        let mut parameter = $crate::models::OpgOperationParameter {
-            description: None,
-            parameter_in: $crate::models::OpgOperationParameterIn::Header,
-            required: false,
-            schema: Some($components.mention::<String>(false, &Default::default())),
+    (@opg_path_value_parameters $components:ident $context:ident $(,)? (header $name:literal): { $($properties:tt)* } $($other:tt)*) => {
+        {
+            let mut parameter = $crate::models::OpgOperationParameter {
+                description: None,
+                parameter_in: $crate::models::OpgOperationParameterIn::Header,
+                required: true,
+                schema: Some($components.mention::<String>(false, &Default::default())),
+            };
+            describe_api!(@opg_path_value_parameter_properties $components parameter $($properties)*);
+            $context.parameters.insert($name.to_owned(), parameter);
+        }
+        describe_api!(@opg_path_value_parameters $components $context $($other)*)
+    };
+    (@opg_path_value_parameters $components:ident $context:ident $(,)? (header $name:literal) $($other:tt)*) => {
+        {
+            let mut parameter = $crate::models::OpgOperationParameter {
+                description: None,
+                parameter_in: $crate::models::OpgOperationParameterIn::Header,
+                required: true,
+                schema: Some($components.mention::<String>(false, &Default::default())),
+            };
+            $context.parameters.insert($name.to_owned(), parameter);
+        }
+        describe_api!(@opg_path_value_parameters $components $context $($other)*)
+    };
+    (@opg_path_value_parameters $components:ident $context:ident $(,)? (query $name:ident: $type:path): { $($properties:tt)* } $($other:tt)*) => {
+        {
+            let mut parameter = $crate::models::OpgOperationParameter {
+                description: None,
+                parameter_in: $crate::models::OpgOperationParameterIn::Header,
+                required: false,
+                schema: Some($components.mention::<$type>(false, &Default::default())),
+            };
+            describe_api!(@opg_path_value_parameter_properties $components parameter $($properties)*);
+            $context.parameters.insert(stringify!($name).to_owned(), parameter);
+        }
+        describe_api!(@opg_path_value_parameters $components $context $($other)*)
+    };
+    (@opg_path_value_parameters $components:ident $context:ident $(,)? (query $name:ident: $type:path) $($other:tt)*) => {
+        {
+            let mut parameter = $crate::models::OpgOperationParameter {
+                description: None,
+                parameter_in: $crate::models::OpgOperationParameterIn::Header,
+                required: false,
+                schema: Some($components.mention::<$type>(false, &Default::default())),
+            };
+            $context.parameters.insert(stringify!($name).to_owned(), parameter);
         };
-        describe_api!(@opg_path_value_parameter_properties $components parameter $($properties)*);
-        $context.parameters.insert($name.to_owned(), parameter);
-    }};
-    (@opg_path_value_parameters $components:ident $context:ident (query $name:ident: $type:path): { $($properties:tt)* } $($other:tt)*) => {{
-        let mut parameter = $crate::models::OpgOperationParameter {
-            description: None,
-            parameter_in: $crate::models::OpgOperationParameterIn::Header,
-            required: false,
-            schema: Some($components.mention::<$type>(false, &Default::default())),
-        };
-        describe_api!(@opg_path_value_parameter_properties $components parameter $($properties)*);
-        $context.parameters.insert(stringify!($name).to_owned(), parameter);
-    }};
+        describe_api!(@opg_path_value_parameters $components $context $($other)*)
+    };
+    (@opg_path_value_parameters $components:ident $context:ident $(,)?) => {};
 
 
     (@opg_path_value_parameter_properties $components:ident $context:ident $(,)? description: $value:literal $($other:tt)*) => {
@@ -497,7 +528,7 @@ macro_rules! describe_api {
     (@opg_path_url_element $components:ident $context:ident $parameter:path) => {{
         let name = {
             let name = stringify!($parameter);
-            string[..1].to_ascii_lowercase() + &string[1..]
+            name[..1].to_ascii_lowercase() + &name[1..]
         };
         describe_api!(@opg_path_insert_url_param $components $context name $parameter)
     }};

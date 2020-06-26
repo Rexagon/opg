@@ -53,8 +53,9 @@ mod tests {
                     parameters: {
                         (header "x-request-id"): {
                             description: "Test",
-                            required: true,
-                        }
+                        },
+                        (header "test"),
+                        (header "asd"),
                     },
                     GET: {
                         tags: {internal},
@@ -151,8 +152,18 @@ paths:
               schema:
                 $ref: "#/components/schemas/SuperResponse"
     parameters:
+      - name: asd
+        in: header
+        required: true
+        schema:
+          type: string
       - name: paramTest
         in: path
+        required: true
+        schema:
+          type: string
+      - name: test
+        in: header
         required: true
         schema:
           type: string
