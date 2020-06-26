@@ -3,13 +3,21 @@ mod tests {
     use opg::*;
     use serde::Serialize;
 
-    #[derive(Debug, Clone, Serialize, OpgModel)]
+    #[derive(Debug, Clone, Serialize, opg::OpgModel)]
     #[serde(rename_all = "camelCase")]
-    #[opg("New type description", string)]
+    #[opg("New type description")]
     enum SuperResponse {
         Test,
         Another,
         Yay,
+    }
+
+    mod request {
+        use super::*;
+        #[derive(Debug, Clone, Serialize, opg::OpgModel)]
+        pub struct InModule {
+            field: String,
+        }
     }
 
     #[test]
@@ -24,6 +32,14 @@ mod tests {
                 "https://my.super.server.com/v1",
             },
             paths: {
+                ("test"): {
+                    POST: {
+                        body: {
+                            schema: request::InModule,
+                        }
+                        200("Ok"): std::vec::Vec<String>,
+                    }
+                },
                 ("hello" / "world" / { paramTest: String }): {
                     summary: "Some test group of requests",
                     description: "Another test description",
@@ -42,7 +58,7 @@ mod tests {
                                 description: "Test",
                             }
                         }
-                        200: String ("Ok"),
+                        200("Ok"): String,
                     },
                     POST: {
                         tags: {admin},
@@ -51,7 +67,7 @@ mod tests {
                             schema: String,
                             required: true,
                         }
-                        200: SuperResponse ("Ok")
+                        200("Ok"): SuperResponse,
                     }
                 }
             }
@@ -71,6 +87,24 @@ tags:
 servers:
   - url: "https://my.super.server.com/v1"
 paths:
+  /test:
+    post:
+      requestBody:
+        required: true
+        description: ~
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InModule"
+      responses:
+        200:
+          description: Ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
   "/hello/world/{paramTest}":
     summary: Some test group of requests
     description: Another test description
@@ -123,6 +157,13 @@ paths:
           type: string
 components:
   schemas:
+    InModule:
+      type: object
+      properties:
+        field:
+          type: string
+      required:
+        - field
     SuperResponse:
       description: New type description
       type: string

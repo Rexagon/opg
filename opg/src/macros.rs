@@ -383,7 +383,7 @@ macro_rules! describe_api {
         });
         describe_api!(@opg_path_value_operation_properties $components $context $($other)*)
     };
-    (@opg_path_value_operation_properties $components:ident $context:ident $(,)? $response:literal: $type:tt ($description:literal) $($other:tt)*) => {
+    (@opg_path_value_operation_properties $components:ident $context:ident $(,)? $response:literal($description:literal): $type:path, $($other:tt)*) => {
         $context.responses.insert($response, $crate::models::OpgResponse {
             description: $description.to_owned(),
             schema: $components.mention::<$type>()
@@ -393,7 +393,7 @@ macro_rules! describe_api {
     (@opg_path_value_operation_properties $components:ident $context:ident $(,)?) => {};
 
 
-    (@opg_path_value_body_properties $components:ident $description:ident $required:ident $schema:ident $(,)? schema: $type:tt $($other:tt)*) => {
+    (@opg_path_value_body_properties $components:ident $description:ident $required:ident $schema:ident $(,)? schema: $type:path, $($other:tt)*) => {
         let $schema = $components.mention::<$type>();
         describe_api!(@opg_path_value_body_properties $components $description $required $schema $($other)*)
     };
@@ -418,7 +418,7 @@ macro_rules! describe_api {
         describe_api!(@opg_path_value_parameter_properties $components parameter $($properties)*);
         $context.parameters.insert($name.to_owned(), parameter);
     }};
-    (@opg_path_value_parameters $components:ident $context:ident (query $name:ident: $type:ty): { $($properties:tt)* } $($other:tt)*) => {{
+    (@opg_path_value_parameters $components:ident $context:ident (query $name:ident: $type:path): { $($properties:tt)* } $($other:tt)*) => {{
         let mut parameter = $crate::models::OpgOperationParameter {
             description: None,
             parameter_in: $crate::models::OpgOperationParameterIn::Header,
@@ -441,7 +441,7 @@ macro_rules! describe_api {
         $context.required = $value;
         describe_api!(@opg_path_value_parameter_properties $components $context $($other)*)
     };
-    (@opg_path_value_parameter_properties $components:ident $context:ident $(,)? schema: $type:tt $($other:tt)*) => {
+    (@opg_path_value_parameter_properties $components:ident $context:ident $(,)? schema: $type:path, $($other:tt)*) => {
         $context.schema = Some($components.mention::<$type>());
         describe_api!(@opg_path_value_parameter_properties $components $context $($other)*)
     };
