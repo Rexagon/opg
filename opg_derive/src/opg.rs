@@ -659,7 +659,7 @@ fn field_model_reference<'a>(
             let context_params = context_params.tokenize();
 
             quote! {
-                cx.mention::<#type_name>(#inline, &#context_params)
+                cx.mention_schema::<#type_name>(#inline, &#context_params)
             }
         }
     }

@@ -207,7 +207,7 @@ macro_rules! impl_opg_model(
                     description: None,
                     data: $crate::ModelData::OneOf($crate::ModelOneOf {
                         one_of: vec![
-                            $(cx.mention::<$type>(false, &Default::default())),*
+                            $(cx.mention_schema::<$type>(false, &Default::default())),*
                         ],
                     }),
                 };
@@ -241,7 +241,7 @@ macro_rules! impl_opg_model(
                     data: $crate::ModelData::Single($crate::ModelType {
                         nullable: false,
                         type_description: $crate::ModelTypeDescription::Array($crate::ModelArray {
-                            items: Box::new(cx.mention::<T>(false, &Default::default())),
+                            items: Box::new(cx.mention_schema::<T>(false, &Default::default())),
                         })
                     }),
                 }
@@ -271,7 +271,7 @@ macro_rules! impl_opg_model(
                     data: $crate::ModelData::Single($crate::ModelType {
                         nullable: false,
                         type_description: $crate::ModelTypeDescription::Object($crate::ModelObject {
-                            additional_properties: Some(Box::new(cx.mention::<T>(false, &Default::default()))),
+                            additional_properties: Some(Box::new(cx.mention_schema::<T>(false, &Default::default()))),
                             ..Default::default()
                         })
                     }),
@@ -324,232 +324,315 @@ macro_rules! impl_opg_model(
 
 #[macro_export]
 macro_rules! describe_api {
-    ($($property:ident: {$($property_value:tt)+}),*$(,)?) => {{
-        let mut components = $crate::models::OpgComponents::default();
-        $crate::models::Opg {
-            $($property: { describe_api!(@opg_property components $property $($property_value)*) },)*
-            components,
-            ..Default::default()
-        }
+    ($($property:ident: {$($property_value:tt)*}),*$(,)?) => {{
+        let mut result = $crate::models::Opg::default();
+
+        $(describe_api!(@opg_property result $property $($property_value)*));+;
+
+        result
     }};
 
 
-    (@opg_property $components:ident info $($property:ident: $property_value:literal),*$(,)?) => {{
+    (@opg_property $result:ident info $($property:ident: $property_value:literal),*$(,)?) => {{
         $(let $property = describe_api!(@opg_info_property $property $property_value));*;
-        $crate::models::OpgInfo {
+        $result.info = $crate::models::OpgInfo {
             $($property,)*
             ..Default::default()
-        }
+        };
     }};
     (@opg_info_property title $value:literal) => { $value.to_owned() };
     (@opg_info_property version $value:literal) => { $value.to_owned() };
     (@opg_info_property description $value:literal) => { Some($value.to_owned()) };
 
 
-    (@opg_property $components:ident tags $($tag:ident$(($description:literal))?),*$(,)?) => {{
-        let mut tags = std::collections::BTreeMap::new();
-        $(tags.insert(stringify!($tag).to_owned(), $crate::models::OpgTag {
+    (@opg_property $result:ident tags $($tag:ident$(($description:literal))?),*$(,)?) => {{
+        $($result.tags.insert(stringify!($tag).to_owned(), $crate::models::OpgTag {
             description: $crate::macros::FromStrangeTuple::extract(($($description.to_string(),)?)),
         }));*;
-        tags
     }};
 
-    (@opg_property $components:ident servers $($url:literal$(($description:literal))?),*$(,)?) => {{
-        let mut servers = Vec::new();
-        $(servers.push($crate::models::OpgServer {
+
+    (@opg_property $result:ident servers $($url:literal$(($description:literal))?),*$(,)?) => {{
+        $($result.servers.push($crate::models::OpgServer {
             url: $url.to_owned(),
             description: $crate::macros::FromStrangeTuple::extract(($($description.to_string(),)?)),
         }));*;
-        servers
     }};
 
 
-    (@opg_property $components:ident paths $(($first_path_segment:tt$( / $path_segment:tt)*): {
+    (@opg_property $result:ident security_schemes $($schemes:tt)*) => {
+        describe_api!(@opg_security_scheme $result $($schemes)*,)
+    };
+    (@opg_security_scheme $result:ident $scheme:ident, $($other:tt)*) => {
+        $result.components.security_schemes.insert(stringity!($scheme).to_owned(), $scheme);
+        describe_api!(@opg_security_scheme $result $($other)*)
+    };
+    (@opg_security_scheme $result:ident (http $name:literal): {$($properties:tt)+}, $($other:tt)*) => {
+        {
+            let scheme = $crate::models::ParameterNotSpecified;
+            let mut bearer_format: Option<String> = None;
+
+            describe_api!(@opg_security_scheme_http scheme bearer_format $($properties)*,);
+
+            let http_security_scheme = match scheme {
+                $crate::HttpSecuritySchemeKind::Basic => $crate::models::HttpSecurityScheme::Basic,
+                $crate::HttpSecuritySchemeKind::Bearer => $crate::models::HttpSecurityScheme::Bearer {
+                    format: bearer_format,
+                },
+            };
+
+            $result.components.security_schemes.insert($name.to_owned(), $crate::models::SecurityScheme::Http(http_security_scheme));
+        };
+        describe_api!(@opg_security_scheme $result $($other)*)
+    };
+    (@opg_security_scheme $result:ident (apiKey $name:literal): {$($properties:tt)+}, $($other:tt)*) => {
+        {
+            let mut parameter_in = $crate::models::ParameterIn::Header;
+            let name = $crate::models::ParameterNotSpecified;
+
+            describe_api!(@opg_security_scheme_api_key parameter_in name $($properties)*,);
+
+            let scheme = $crate::models::ApiKeySecurityScheme {
+                parameter_in,
+                name,
+            };
+
+            $result.components.security_schemes.insert($name.to_owned(), $crate::models::SecurityScheme::ApiKey(scheme));
+        };
+        describe_api!(@opg_security_scheme $result $($other)*)
+    };
+    (@opg_security_scheme $result:ident $(,)?) => {};
+
+
+    (@opg_security_scheme_http $scheme:ident $bearer_format:ident scheme: $scheme_kind:ident, $($other:tt)*) => {
+        let $scheme = $crate::models::HttpSecuritySchemeKind::$scheme_kind;
+        describe_api!(@opg_security_scheme_http $scheme $bearer_format $($other)*)
+    };
+    (@opg_security_scheme_http $scheme:ident $bearer_format:ident bearer_format: $format:literal, $($other:tt)*) => {
+        let $bearer_format = Some($format.to_owned());
+        describe_api!(@opg_security_scheme_http $scheme $bearer_format $($other)*)
+    };
+    (@opg_security_scheme_http $scheme:ident $bearer_format:ident $(,)?) => {};
+
+
+    (@opg_security_scheme_api_key $parameter_in:ident $name:ident parameter_in: $value:ident, $($other:tt)*) => {
+        $parameter_in = $crate::models::ParameterIn::$value;
+        describe_api!(@opg_security_scheme_api_key $parameter_in $name $($other)*)
+    };
+    (@opg_security_scheme_api_key $parameter_in:ident $name:ident name: $value:literal, $($other:tt)*) => {
+        let $name = $value.to_owned();
+        describe_api!(@opg_security_scheme_api_key $parameter_in $name $($other)*)
+    };
+    (@opg_security_scheme_api_key $parameter_in:ident $name:ident $(,)?) => {};
+
+
+    (@opg_property $result:ident paths $(($first_path_segment:tt$( / $path_segment:tt)*): {
         $($properties:tt)*
     }),*$(,)?) => {{
-        let mut result = Vec::new();
         $({
             let mut path = Vec::new();
             let mut context = $crate::models::OpgPathValue::default();
 
-            describe_api!(@opg_path_url path $components context $first_path_segment $($path_segment)*);
-            describe_api!(@opg_path_value_properties $components context $($properties)*);
+            describe_api!(@opg_path_url path $result context $first_path_segment $($path_segment)*);
+            describe_api!(@opg_path_value_properties $result context $($properties)*,);
 
-            result.push(($crate::models::OpgPath(path), context));
+            $result.paths.push(($crate::models::OpgPath(path), context));
         };)*
-        result
     }};
 
 
-    (@opg_path_value_properties $components:ident $context:ident $(,)? $field:ident: $value:literal $($other:tt)*) => {
+    (@opg_path_value_properties $result:ident $context:ident $field:ident: $value:literal, $($other:tt)*) => {
         $context.$field = Some($value.to_owned());
-        describe_api!(@opg_path_value_properties $components $context $($other)*)
+        describe_api!(@opg_path_value_properties $result $context $($other)*)
     };
-    (@opg_path_value_properties $components:ident $context:ident $(,)? parameters: { $($parameters:tt)* } $($other:tt)*) => {
-        describe_api!(@opg_path_value_parameters $components $context $($parameters)*);
-        describe_api!(@opg_path_value_properties $components $context $($other)*)
+    (@opg_path_value_properties $result:ident $context:ident parameters: { $($parameters:tt)* }, $($other:tt)*) => {
+        describe_api!(@opg_path_value_parameters $result $context $($parameters)*,);
+        describe_api!(@opg_path_value_properties $result $context $($other)*)
     };
-    (@opg_path_value_properties $components:ident $context:ident $(,)? $method:ident: { $($properties:tt)* } $($other:tt)*) => {
+    (@opg_path_value_properties $result:ident $context:ident $method:ident: { $($properties:tt)* }, $($other:tt)*) => {
         let mut operation = $crate::models::OpgOperation::default();
-        describe_api!(@opg_path_value_operation_properties $components operation $($properties)*);
+        describe_api!(@opg_path_value_operation_properties $result operation $($properties)*,);
         $context.operations.insert($crate::models::OpgHttpMethod::$method, operation);
 
-        describe_api!(@opg_path_value_properties $components $context $($other)*)
+        describe_api!(@opg_path_value_properties $result $context $($other)*)
     };
-    (@opg_path_value_properties $components:ident $context:ident $(,)?) => {};
+    (@opg_path_value_properties $result:ident $context:ident $(,)?) => {};
 
 
-    (@opg_path_value_operation_properties $components:ident $context:ident $(,)? $field:ident: $value:literal $($other:tt)*) => {
+    (@opg_path_value_operation_properties $result:ident $context:ident $field:ident: $value:literal, $($other:tt)*) => {
         $context.$field = Some($value.to_owned());
-        describe_api!(@opg_path_value_operation_properties $components $context $($other)*)
+        describe_api!(@opg_path_value_operation_properties $result $context $($other)*)
     };
-    (@opg_path_value_operation_properties $components:ident $context:ident $(,)? tags: {$($tag:ident),*$(,)?} $($other:tt)*) => {
+    (@opg_path_value_operation_properties $result:ident $context:ident tags: {$($tag:ident),*$(,)?}, $($other:tt)*) => {
         $($context.tags.push(stringify!($tag).to_owned()));*;
-        describe_api!(@opg_path_value_operation_properties $components $context $($other)*)
+        describe_api!(@opg_path_value_operation_properties $result $context $($other)*)
     };
-    (@opg_path_value_operation_properties $components:ident $context:ident $(,)? parameters: { $($parameters:tt)* } $($other:tt)*) => {
-        describe_api!(@opg_path_value_parameters $components $context $($parameters)*);
-        describe_api!(@opg_path_value_operation_properties $components $context $($other)*)
+    (@opg_path_value_operation_properties $result:ident $context:ident parameters: { $($parameters:tt)* }, $($other:tt)*) => {
+        describe_api!(@opg_path_value_parameters $result $context $($parameters)*,);
+        describe_api!(@opg_path_value_operation_properties $result $context $($other)*)
     };
-    (@opg_path_value_operation_properties $components:ident $context:ident $(,)? body: { $($body:tt)* } $($other:tt)*) => {
+    (@opg_path_value_operation_properties $result:ident $context:ident security: { $($security:tt)* }, $($other:tt)*) => {
+        describe_api!(@opg_path_value_security $result $context $($security)*,);
+        describe_api!(@opg_path_value_operation_properties $result $context $($other)*)
+    };
+    (@opg_path_value_operation_properties $result:ident $context:ident body: { $($body:tt)* }, $($other:tt)*) => {
         let mut description = None;
         let mut required = true;
-        let schema = std::marker::PhantomData::<()>; // just as stub
-        describe_api!(@opg_path_value_body_properties $components description required schema $($body)*);
+        let schema = $crate::models::ParameterNotSpecified;
+        describe_api!(@opg_path_value_body_properties $result description required schema $($body)*,);
         $context.request_body = Some($crate::models::OpgRequestBody {
            description: description.or(Some(String::new())),
            required,
            schema, // schema must be specified
         });
-        describe_api!(@opg_path_value_operation_properties $components $context $($other)*)
+        describe_api!(@opg_path_value_operation_properties $result $context $($other)*)
     };
-    (@opg_path_value_operation_properties $components:ident $context:ident $(,)? body: $type:path, $($other:tt)*) => {
+    (@opg_path_value_operation_properties $result:ident $context:ident body: $type:path, $($other:tt)*) => {
         $context.request_body = Some($crate::models::OpgRequestBody {
            description: Some(String::new()),
            required: true,
-           schema: $components.mention::<$type>(false, &Default::default()),
+           schema: $result.components.mention_schema::<$type>(false, &Default::default()),
         });
-        describe_api!(@opg_path_value_operation_properties $components $context $($other)*)
+        describe_api!(@opg_path_value_operation_properties $result $context $($other)*)
     };
-    (@opg_path_value_operation_properties $components:ident $context:ident $(,)? $response:literal($description:literal): $type:path, $($other:tt)*) => {
+    (@opg_path_value_operation_properties $result:ident $context:ident $response:literal($description:literal): $type:path, $($other:tt)*) => {
         $context.responses.insert($response, $crate::models::OpgResponse {
             description: $description.to_owned(),
-            schema: $components.mention::<$type>(false, &Default::default())
+            schema: $result.components.mention_schema::<$type>(false, &Default::default())
         });
-        describe_api!(@opg_path_value_operation_properties $components $context $($other)*)
+        describe_api!(@opg_path_value_operation_properties $result $context $($other)*)
     };
-    (@opg_path_value_operation_properties $components:ident $context:ident $(,)?) => {};
+    (@opg_path_value_operation_properties $result:ident $context:ident $(,)?) => {};
 
 
-    (@opg_path_value_body_properties $components:ident $description:ident $required:ident $schema:ident $(,)? schema: $type:path, $($other:tt)*) => {
-        let $schema = $components.mention::<$type>(false, &Default::default());
-        describe_api!(@opg_path_value_body_properties $components $description $required $schema $($other)*)
+    (@opg_path_value_security $result:ident $context:ident $($security:tt$([$($role:literal),*])?)&&+, $($other:tt)*) => {
+        {
+            let mut security = std::collections::BTreeMap::new();
+            $(describe_api!(@opg_path_value_security_item $result security $security$([$($role),*])?));*;
+            $context.security.push(security);
+        }
+        describe_api!(@opg_path_value_security $result $context $($other)*)
     };
-    (@opg_path_value_body_properties $components:ident $description:ident $required:ident $schema:ident $(,)? description: $value:literal $($other:tt)*) => {
+    (@opg_path_value_security $result:ident $context:ident $(,)*) => {};
+
+
+    (@opg_path_value_security_item $result:ident $context:ident $security:literal$([$($role:literal),*])?) => {
+        $context.insert($security.to_owned(), vec![$($($role),*)?])
+    };
+    (@opg_path_value_security_item $result:ident $context:ident $security:ident$([$($role:literal),*])?) => {
+        $context.insert($result.components.mention_security_scheme(stringify!($security).to_owned(), &$security), vec![$($($role),*)?])
+    };
+
+
+    (@opg_path_value_body_properties $result:ident $description:ident $required:ident $schema:ident schema: $type:path, $($other:tt)*) => {
+        let $schema = $result.components.mention_schema::<$type>(false, &Default::default());
+        describe_api!(@opg_path_value_body_properties $result $description $required $schema $($other)*)
+    };
+    (@opg_path_value_body_properties $result:ident $description:ident $required:ident $schema:ident description: $value:literal, $($other:tt)*) => {
         $description = Some($value.to_owned());
-        describe_api!(@opg_path_value_body_properties $components $description $required $schema $($other)*)
+        describe_api!(@opg_path_value_body_properties $result $description $required $schema $($other)*)
     };
-    (@opg_path_value_body_properties $components:ident $description:ident $required:ident $schema:ident $(,)? required: $value:literal $($other:tt)*) => {
+    (@opg_path_value_body_properties $result:ident $description:ident $required:ident $schema:ident required: $value:literal, $($other:tt)*) => {
         $required = $value;
-        describe_api!(@opg_path_value_body_properties $components $description $required $schema $($other)*)
+        describe_api!(@opg_path_value_body_properties $result $description $required $schema $($other)*)
     };
-    (@opg_path_value_body_properties $components:ident $description:ident $required:ident $schema:ident $(,)?) => {};
+    (@opg_path_value_body_properties $result:ident $description:ident $required:ident $schema:ident $(,)?) => {};
 
 
-    (@opg_path_value_parameters $components:ident $context:ident $(,)? (header $name:literal): { $($properties:tt)* } $($other:tt)*) => {
+    (@opg_path_value_parameters $result:ident $context:ident (header $name:literal): { $($properties:tt)* }, $($other:tt)*) => {
         {
             let mut parameter = $crate::models::OpgOperationParameter {
                 description: None,
-                parameter_in: $crate::models::OpgOperationParameterIn::Header,
+                parameter_in: $crate::models::ParameterIn::Header,
                 required: true,
-                schema: Some($components.mention::<String>(false, &Default::default())),
+                schema: Some($result.components.mention_schema::<String>(false, &Default::default())),
             };
-            describe_api!(@opg_path_value_parameter_properties $components parameter $($properties)*);
+            describe_api!(@opg_path_value_parameter_properties $result parameter $($properties)*,);
             $context.parameters.insert($name.to_owned(), parameter);
         }
-        describe_api!(@opg_path_value_parameters $components $context $($other)*)
+        describe_api!(@opg_path_value_parameters $result $context $($other)*)
     };
-    (@opg_path_value_parameters $components:ident $context:ident $(,)? (header $name:literal) $($other:tt)*) => {
+    (@opg_path_value_parameters $result:ident $context:ident (header $name:literal), $($other:tt)*) => {
         {
             let mut parameter = $crate::models::OpgOperationParameter {
                 description: None,
-                parameter_in: $crate::models::OpgOperationParameterIn::Header,
+                parameter_in: $crate::models::ParameterIn::Header,
                 required: true,
-                schema: Some($components.mention::<String>(false, &Default::default())),
+                schema: Some($result.components.mention_schema::<String>(false, &Default::default())),
             };
             $context.parameters.insert($name.to_owned(), parameter);
         }
-        describe_api!(@opg_path_value_parameters $components $context $($other)*)
+        describe_api!(@opg_path_value_parameters $result $context $($other)*)
     };
-    (@opg_path_value_parameters $components:ident $context:ident $(,)? (query $name:ident: $type:path): { $($properties:tt)* } $($other:tt)*) => {
+    (@opg_path_value_parameters $result:ident $context:ident (query $name:ident: $type:path): { $($properties:tt)* }, $($other:tt)*) => {
         {
             let mut parameter = $crate::models::OpgOperationParameter {
                 description: None,
-                parameter_in: $crate::models::OpgOperationParameterIn::Header,
+                parameter_in: $crate::models::ParameterIn::Header,
                 required: false,
-                schema: Some($components.mention::<$type>(false, &Default::default())),
+                schema: Some($result.components.mention_schema::<$type>(false, &Default::default())),
             };
-            describe_api!(@opg_path_value_parameter_properties $components parameter $($properties)*);
+            describe_api!(@opg_path_value_parameter_properties $result parameter $($properties)*,);
             $context.parameters.insert(stringify!($name).to_owned(), parameter);
         }
-        describe_api!(@opg_path_value_parameters $components $context $($other)*)
+        describe_api!(@opg_path_value_parameters $result $context $($other)*)
     };
-    (@opg_path_value_parameters $components:ident $context:ident $(,)? (query $name:ident: $type:path) $($other:tt)*) => {
+    (@opg_path_value_parameters $result:ident $context:ident (query $name:ident: $type:path), $($other:tt)*) => {
         {
             let mut parameter = $crate::models::OpgOperationParameter {
                 description: None,
-                parameter_in: $crate::models::OpgOperationParameterIn::Header,
+                parameter_in: $crate::models::ParameterIn::Header,
                 required: false,
-                schema: Some($components.mention::<$type>(false, &Default::default())),
+                schema: Some($result.components.mention_schema::<$type>(false, &Default::default())),
             };
             $context.parameters.insert(stringify!($name).to_owned(), parameter);
-        };
-        describe_api!(@opg_path_value_parameters $components $context $($other)*)
+        }
+        describe_api!(@opg_path_value_parameters $result $context $($other)*)
     };
-    (@opg_path_value_parameters $components:ident $context:ident $(,)?) => {};
+    (@opg_path_value_parameters $result:ident $context:ident $(,)?) => {};
 
 
-    (@opg_path_value_parameter_properties $components:ident $context:ident $(,)? description: $value:literal $($other:tt)*) => {
+    (@opg_path_value_parameter_properties $result:ident $context:ident description: $value:literal, $($other:tt)*) => {
         $context.description = Some($value.to_owned());
-        describe_api!(@opg_path_value_parameter_properties $components $context $($other)*)
+        describe_api!(@opg_path_value_parameter_properties $result $context $($other)*)
     };
-    (@opg_path_value_parameter_properties $components:ident $context:ident $(,)? required: $value:literal $($other:tt)*) => {
+    (@opg_path_value_parameter_properties $result:ident $context:ident required: $value:literal, $($other:tt)*) => {
         $context.required = $value;
-        describe_api!(@opg_path_value_parameter_properties $components $context $($other)*)
+        describe_api!(@opg_path_value_parameter_properties $result $context $($other)*)
     };
-    (@opg_path_value_parameter_properties $components:ident $context:ident $(,)? schema: $type:path, $($other:tt)*) => {
-        $context.schema = Some($components.mention::<$type>(false, &Default::default()));
-        describe_api!(@opg_path_value_parameter_properties $components $context $($other)*)
+    (@opg_path_value_parameter_properties $result:ident $context:ident schema: $type:path, $($other:tt)*) => {
+        $context.schema = Some($result.components.mention_schema::<$type>(false, &Default::default()));
+        describe_api!(@opg_path_value_parameter_properties $result $context $($other)*)
     };
-    (@opg_path_value_parameter_properties $components:ident $context:ident $(,)?) => {};
+    (@opg_path_value_parameter_properties $result:ident $context:ident $(,)?) => {};
 
 
-    (@opg_path_url $path:ident $components:ident $context:ident $current:tt $($other:tt)*) => {
-        $path.push(describe_api!(@opg_path_url_element $components $context $current));
-        describe_api!(@opg_path_url $path $components $context $($other)*)
+    (@opg_path_url $path:ident $result:ident $context:ident $current:tt $($other:tt)*) => {
+        $path.push(describe_api!(@opg_path_url_element $result $context $current));
+        describe_api!(@opg_path_url $path $result $context $($other)*)
     };
-    (@opg_path_url $path:ident $components:ident $context:ident) => {};
+    (@opg_path_url $path:ident $result:ident $context:ident) => {};
 
-    (@opg_path_url_element $components:ident $context:ident $segment:literal) => {
+    (@opg_path_url_element $result:ident $context:ident $segment:literal) => {
         $crate::models::OpgPathElement::Path($segment.to_owned())
     };
-    (@opg_path_url_element $components:ident $context:ident $parameter:path) => {{
+    (@opg_path_url_element $result:ident $context:ident $parameter:path) => {{
         let name = {
             let name = stringify!($parameter);
             name[..1].to_ascii_lowercase() + &name[1..]
         };
-        describe_api!(@opg_path_insert_url_param $components $context name $parameter)
+        describe_api!(@opg_path_insert_url_param $result $context name $parameter)
     }};
-    (@opg_path_url_element $components:ident $context:ident {$name:ident: $parameter:path}) => {{
+    (@opg_path_url_element $result:ident $context:ident {$name:ident: $parameter:path}) => {{
         let name = stringify!($name).to_owned();
-        describe_api!(@opg_path_insert_url_param $components $context name $parameter)
+        describe_api!(@opg_path_insert_url_param $result $context name $parameter)
     }};
-    (@opg_path_insert_url_param $components:ident $context:ident $name:ident $parameter:path) => {{
+    (@opg_path_insert_url_param $result:ident $context:ident $name:ident $parameter:path) => {{
         $context.parameters.insert($name.clone(), $crate::models::OpgOperationParameter {
             description: None,
-            parameter_in: $crate::models::OpgOperationParameterIn::Path,
+            parameter_in: $crate::models::ParameterIn::Path,
             required: true,
-            schema: Some($components.mention::<$parameter>(false, &Default::default()))
+            schema: Some($result.components.mention_schema::<$parameter>(false, &Default::default()))
         });
         $crate::models::OpgPathElement::Parameter($name)
     }}

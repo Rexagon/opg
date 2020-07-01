@@ -29,6 +29,11 @@ mod tests {
 
     #[test]
     fn expands_normally() {
+        let test_auth = ApiKeySecurityScheme {
+            parameter_in: ParameterIn::Query,
+            name: "X-MY-SUPER-API".to_string(),
+        };
+
         let test = describe_api! {
             info: {
                 title: "My super API",
@@ -36,13 +41,29 @@ mod tests {
             },
             tags: {internal, admin("Super admin methods")},
             servers: {
-                "https://my.super.server.com/v1",
+                "https://my.super.server.com/v1"
+            },
+            security_schemes: {
+                (http "bearerAuth"): {
+                    scheme: Bearer,
+                    bearer_format: "JWT",
+                },
+                (http "basicAuth"): {
+                    scheme: Basic
+                },
+                (apiKey "ApiKeyAuth"): {
+                    parameter_in: Query,
+                    name: "X-API-KEY"
+                }
             },
             paths: {
                 ("test"): {
                     POST: {
+                        security: {
+                            test_auth && "basicAuth"
+                        },
                         body: request::InModule,
-                        200("Ok"): std::vec::Vec<String>,
+                        200("Ok"): std::vec::Vec<String>
                     }
                 },
                 ("hello" / "world" / { paramTest: String }): {
@@ -53,7 +74,7 @@ mod tests {
                             description: "Test",
                         },
                         (header "test"),
-                        (header "asd"),
+                        (header "asd")
                     },
                     GET: {
                         tags: {internal},
@@ -62,17 +83,17 @@ mod tests {
                         parameters: {
                             (query someParam: u32): {
                                 description: "Test",
-                            }
-                        }
-                        200("Ok"): String,
+                            },
+                        },
+                        200("Ok"): String
                     },
                     POST: {
                         tags: {admin},
                         body: {
                             description: "Some interesting description",
                             schema: String,
-                            required: true,
-                        }
+                            required: true
+                        },
                         200("Ok"): SuperResponse,
                     }
                 }

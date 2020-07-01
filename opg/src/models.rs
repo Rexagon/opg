@@ -183,13 +183,21 @@ where
 pub struct OpgOperation {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub summary: Option<String>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub security: Vec<BTreeMap<String, Vec<String>>>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub request_body: Option<OpgRequestBody>,
+
     pub responses: BTreeMap<u16, OpgResponse>,
+
     #[serde(
         skip_serializing_if = "BTreeMap::is_empty",
         serialize_with = "serialize_parameters"
@@ -290,7 +298,7 @@ where
         #[serde(skip_serializing_if = "Option::is_none")]
         description: &'a Option<String>,
         #[serde(rename = "in")]
-        parameter_in: OpgOperationParameterIn,
+        parameter_in: ParameterIn,
         #[serde(skip_serializing_if = "is_false")]
         required: bool,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -315,14 +323,14 @@ where
 #[derive(Debug, Clone)]
 pub struct OpgOperationParameter {
     pub description: Option<String>,
-    pub parameter_in: OpgOperationParameterIn,
+    pub parameter_in: ParameterIn,
     pub required: bool,
     pub schema: Option<ModelReference>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub enum OpgOperationParameterIn {
+pub enum ParameterIn {
     Query,
     Header,
     Path,
@@ -330,24 +338,28 @@ pub enum OpgOperationParameterIn {
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct OpgComponents {
-    schemas: BTreeMap<String, Model>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub schemas: BTreeMap<String, Model>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub security_schemes: BTreeMap<String, SecurityScheme>,
 }
 
 impl OpgComponents {
     pub fn new() -> Self {
         Self {
             schemas: BTreeMap::new(),
+            security_schemes: BTreeMap::new(),
         }
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn contains_model(&self, name: &str) -> bool {
         self.schemas.contains_key(name)
     }
 
-    #[allow(dead_code)]
-    pub fn mention<M>(&mut self, inline: bool, params: &ContextParams) -> ModelReference
+    pub fn mention_schema<M>(&mut self, inline: bool, params: &ContextParams) -> ModelReference
     where
         M: OpgModel,
     {
@@ -359,6 +371,18 @@ impl OpgComponents {
             }
         }
         reference
+    }
+
+    pub fn mention_security_scheme<T>(&mut self, name: String, security_scheme: &T) -> String
+    where
+        T: Clone,
+        SecurityScheme: From<T>,
+    {
+        if !self.security_schemes.contains_key(&name) {
+            self.security_schemes
+                .insert(name.clone(), security_scheme.clone().into());
+        }
+        name
     }
 
     #[allow(dead_code)]
@@ -490,6 +514,12 @@ impl ModelOneOf {
     }
 }
 
+impl From<ModelOneOf> for ModelData {
+    fn from(data: ModelOneOf) -> Self {
+        ModelData::OneOf(data)
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelType {
@@ -515,6 +545,12 @@ impl ModelType {
             ModelTypeDescription::Object(object) => object.traverse(cx),
             _ => Ok(()),
         }
+    }
+}
+
+impl From<ModelType> for ModelData {
+    fn from(data: ModelType) -> Self {
+        ModelData::Single(data)
     }
 }
 
@@ -567,6 +603,12 @@ impl ModelString {
     }
 }
 
+impl From<ModelString> for ModelTypeDescription {
+    fn from(data: ModelString) -> Self {
+        ModelTypeDescription::String(data)
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelSimple {
@@ -598,6 +640,12 @@ pub struct ModelArray {
 impl ModelArray {
     fn traverse<'a>(&'a self, cx: TraverseContext<'a>) -> Result<(), &'a str> {
         self.items.traverse(cx)
+    }
+}
+
+impl From<ModelArray> for ModelTypeDescription {
+    fn from(data: ModelArray) -> Self {
+        ModelTypeDescription::Array(data)
     }
 }
 
@@ -664,6 +712,12 @@ impl ModelObject {
     }
 }
 
+impl From<ModelObject> for ModelTypeDescription {
+    fn from(data: ModelObject) -> Self {
+        ModelTypeDescription::Object(data)
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum ModelReference {
@@ -706,3 +760,48 @@ impl<'a> TraverseContext<'a> {
         }
     }
 }
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase", tag = "type")]
+pub enum SecurityScheme {
+    Http(HttpSecurityScheme),
+    ApiKey(ApiKeySecurityScheme),
+    // TODO: add `oath2` and `openIdConnect`
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase", tag = "scheme")]
+pub enum HttpSecurityScheme {
+    Basic,
+    Bearer {
+        #[serde(rename = "bearerFormat", skip_serializing_if = "Option::is_none")]
+        format: Option<String>,
+    },
+}
+
+impl From<HttpSecurityScheme> for SecurityScheme {
+    fn from(data: HttpSecurityScheme) -> Self {
+        SecurityScheme::Http(data)
+    }
+}
+
+pub enum HttpSecuritySchemeKind {
+    Basic,
+    Bearer,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApiKeySecurityScheme {
+    #[serde(rename = "in")]
+    pub parameter_in: ParameterIn,
+    pub name: String,
+}
+
+impl From<ApiKeySecurityScheme> for SecurityScheme {
+    fn from(data: ApiKeySecurityScheme) -> Self {
+        SecurityScheme::ApiKey(data)
+    }
+}
+
+pub struct ParameterNotSpecified;
