@@ -116,6 +116,9 @@ servers:
 paths:
   /test:
     post:
+      security:
+        - basicAuth: []
+          test_auth: []
       requestBody:
         required: true
         description: ""
@@ -219,7 +222,23 @@ components:
           nullable: true
           type: string
       required:
-        - another_field"##
+        - another_field
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: query
+      name: X-API-KEY
+    basicAuth:
+      type: http
+      scheme: basic
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    test_auth:
+      type: apiKey
+      in: query
+      name: X-MY-SUPER-API"##
         );
     }
 }

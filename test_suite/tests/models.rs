@@ -373,6 +373,69 @@ required:
         );
     }
 
+    #[derive(Debug, Serialize, Hash, OpgModel)]
+    #[serde(rename_all = "camelCase")]
+    #[opg("Credit history kind")]
+    pub enum CreditHistoryMetaResponse {
+        #[serde(rename_all = "camelCase")]
+        CreateCredit {
+            pledge_currency: Option<String>,
+            pledge_amount: Option<String>,
+            credit_currency: String,
+            credit_amount: String,
+        },
+        CloseCredit,
+        #[serde(rename_all = "camelCase")]
+        FreezePledge {
+            pledge_currency: String,
+            pledge_amount: String,
+        },
+    }
+
+    #[test]
+    fn test_complex_enum() {
+        let mut cx = &mut OpgComponents::default();
+        assert_eq!(
+            serde_yaml::to_string(&CreditHistoryMetaResponse::get_structure(&mut cx)).unwrap(),
+            r##"---
+description: Credit history kind
+type: object
+additionalProperties:
+  description: Credit history kind
+  oneOf:
+    - type: object
+      properties:
+        creditAmount:
+          type: string
+        creditCurrency:
+          type: string
+        pledgeAmount:
+          nullable: true
+          type: string
+        pledgeCurrency:
+          nullable: true
+          type: string
+      required:
+        - pledgeCurrency
+        - pledgeAmount
+        - creditCurrency
+        - creditAmount
+    - type: string
+      enum:
+        - closeCredit
+      example: closeCredit
+    - type: object
+      properties:
+        pledgeAmount:
+          type: string
+        pledgeCurrency:
+          type: string
+      required:
+        - pledgeCurrency
+        - pledgeAmount"##
+        );
+    }
+
     #[test]
     fn test_serialization() {
         let model = Model {

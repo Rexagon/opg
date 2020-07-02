@@ -293,7 +293,7 @@ fn serialize_external_tagged_enum(
                                             variants: Some(vec![#variant_name.to_owned()]),
                                             data: _opg::ModelSimple {
                                                 format: None,
-                                                example: #variant_name.to_owned(),
+                                                example: Some(#variant_name.to_owned()),
                                             }
                                         })
                                     })
