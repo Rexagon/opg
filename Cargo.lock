@@ -62,7 +62,7 @@ dependencies = [
 
 [[package]]
 name = "opg"
-version = "0.0.19"
+version = "0.0.20"
 dependencies = [
  "chrono",
  "either",
@@ -73,7 +73,7 @@ dependencies = [
 
 [[package]]
 name = "opg_derive"
-version = "0.0.19"
+version = "0.0.20"
 dependencies = [
  "either",
  "opg",

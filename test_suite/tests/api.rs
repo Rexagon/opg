@@ -73,7 +73,7 @@ mod tests {
                         (header "x-request-id"): {
                             description: "Test",
                         },
-                        (header "test"),
+                        (query test: i32),
                         (header "asd")
                     },
                     GET: {
@@ -153,7 +153,7 @@ paths:
       parameters:
         - name: someParam
           description: Test
-          in: header
+          in: query
           schema:
             type: integer
     post:
@@ -185,10 +185,9 @@ paths:
         schema:
           type: string
       - name: test
-        in: header
-        required: true
+        in: query
         schema:
-          type: string
+          type: integer
       - name: x-request-id
         description: Test
         in: header

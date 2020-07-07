@@ -568,7 +568,7 @@ macro_rules! describe_api {
         {
             let mut parameter = $crate::models::OpgOperationParameter {
                 description: None,
-                parameter_in: $crate::models::ParameterIn::Header,
+                parameter_in: $crate::models::ParameterIn::Query,
                 required: false,
                 schema: Some($result.components.mention_schema::<$type>(false, &Default::default())),
             };
@@ -581,7 +581,7 @@ macro_rules! describe_api {
         {
             let mut parameter = $crate::models::OpgOperationParameter {
                 description: None,
-                parameter_in: $crate::models::ParameterIn::Header,
+                parameter_in: $crate::models::ParameterIn::Query,
                 required: false,
                 schema: Some($result.components.mention_schema::<$type>(false, &Default::default())),
             };
