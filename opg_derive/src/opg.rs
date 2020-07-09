@@ -374,6 +374,9 @@ fn serialize_internal_tagged_enum(
             let variant_name = variant.attrs.name.serialized();
 
             let model = match &variant.style {
+                StructStyle::Unit => {
+                    object_model(false, &variant.attrs.description, &[], |_| false)
+                }
                 StructStyle::NewType => {
                     let field = &variant.fields[0];
                     let type_name = &field.original.ty;
