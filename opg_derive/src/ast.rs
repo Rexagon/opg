@@ -57,7 +57,7 @@ impl<'a> Container<'a> {
                         if field.attrs.flatten {
                             has_flatten = true;
                         }
-                        field.attrs.rename_by_rule(attrs.rename_rule);
+                        field.attrs.rename_by_rule(variant.attrs.rename_rule);
                     }
                 }
             }

@@ -78,7 +78,7 @@ fn expands_normally() {
 }
 ```
 
-#### Result:
+Result:
 
 ```yaml
 ---
@@ -93,6 +93,27 @@ tags:
 servers:
   - url: "https://my.super.server.com/v1"
 paths:
+  /test:
+    post:
+      security:
+        - basicAuth: []
+          test_auth: []
+      requestBody:
+        required: true
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InModule"
+      responses:
+        200:
+          description: Ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
   "/hello/world/{paramTest}":
     summary: Some test group of requests
     description: Another test description
@@ -111,7 +132,7 @@ paths:
       parameters:
         - name: someParam
           description: Test
-          in: header
+          in: query
           schema:
             type: integer
     post:
@@ -132,11 +153,20 @@ paths:
               schema:
                 $ref: "#/components/schemas/SuperResponse"
     parameters:
+      - name: asd
+        in: header
+        required: true
+        schema:
+          type: string
       - name: paramTest
         in: path
         required: true
         schema:
           type: string
+      - name: test
+        in: query
+        schema:
+          type: integer
       - name: x-request-id
         description: Test
         in: header
@@ -145,6 +175,16 @@ paths:
           type: string
 components:
   schemas:
+    InModule:
+      type: object
+      properties:
+        field:
+          type: string
+        second:
+          $ref: "#/components/schemas/Test"
+      required:
+        - field
+        - second
     SuperResponse:
       description: New type description
       type: string
@@ -153,4 +193,28 @@ components:
         - another
         - yay
       example: test
+    Test:
+      type: object
+      properties:
+        another_field:
+          nullable: true
+          type: string
+      required:
+        - another_field
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: query
+      name: X-API-KEY
+    basicAuth:
+      type: http
+      scheme: basic
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    test_auth:
+      type: apiKey
+      in: query
+      name: X-MY-SUPER-API
 ```

@@ -374,7 +374,7 @@ required:
     }
 
     #[derive(Debug, Serialize, Hash, OpgModel)]
-    #[serde(rename_all = "camelCase")]
+    #[serde(rename_all = "snake_case")]
     #[opg("Credit history kind")]
     pub enum CreditHistoryMetaResponse {
         #[serde(rename_all = "camelCase")]
@@ -422,8 +422,8 @@ additionalProperties:
         - creditAmount
     - type: string
       enum:
-        - closeCredit
-      example: closeCredit
+        - close_credit
+      example: close_credit
     - type: object
       properties:
         pledgeAmount:
