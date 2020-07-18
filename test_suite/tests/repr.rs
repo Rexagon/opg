@@ -17,7 +17,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repr() {
+    fn repr_enum() {
         let mut cx = &mut OpgComponents::default();
         assert_eq!(
             serde_yaml::to_string(&LedgerAccountId::get_schema(&mut cx)).unwrap(),

@@ -156,6 +156,7 @@ paths:
           in: query
           schema:
             type: integer
+            format: uint32
     post:
       tags:
         - admin
@@ -188,6 +189,7 @@ paths:
         in: query
         schema:
           type: integer
+          format: int32
       - name: x-request-id
         description: Test
         in: header

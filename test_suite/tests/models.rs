@@ -12,7 +12,7 @@ mod tests {
     struct NewNewType(NewType);
 
     #[test]
-    fn test_newtype() {
+    fn newtype() {
         let mut cx = OpgComponents::new();
 
         assert_eq!(
@@ -37,13 +37,13 @@ example: 000-000"##
     #[derive(Serialize, OpgModel)]
     #[serde(rename_all = "camelCase")]
     struct SimpleStruct {
-        asd: u32,
+        asd: i32,
         #[opg(optional)]
         hello_camel_case: NewType,
     }
 
     #[test]
-    fn test_simple_struct() {
+    fn simple_struct() {
         let mut cx = &mut OpgComponents::default();
         assert_eq!(
             serde_yaml::to_string(&SimpleStruct::get_schema(&mut cx)).unwrap(),
@@ -52,6 +52,7 @@ type: object
 properties:
   asd:
     type: integer
+    format: int32
   helloCamelCase:
     $ref: "#/components/schemas/NewType"
 required:
@@ -69,7 +70,7 @@ required:
     }
 
     #[test]
-    fn test_string_enum() {
+    fn string_enum() {
         let mut cx = &mut OpgComponents::default();
         assert_eq!(
             serde_yaml::to_string(&StringEnumTest::get_schema(&mut cx)).unwrap(),
@@ -92,7 +93,7 @@ example: first"##
     }
 
     #[test]
-    fn test_externally_enum() {
+    fn externally_enum() {
         let mut cx = &mut OpgComponents::default();
         assert_eq!(
             serde_yaml::to_string(&ExternallyTaggedEnum::get_schema(&mut cx)).unwrap(),
@@ -124,7 +125,7 @@ additionalProperties:
     }
 
     #[test]
-    fn test_untagged_enum() {
+    fn untagged_enum() {
         let mut cx = &mut OpgComponents::default();
         assert_eq!(
             serde_yaml::to_string(&UntaggedEnumTest::get_schema(&mut cx)).unwrap(),
@@ -145,6 +146,7 @@ oneOf:
         properties:
           asd:
             type: integer
+            format: int32
           helloCamelCase:
             $ref: "#/components/schemas/NewType"
         required:
@@ -162,7 +164,7 @@ oneOf:
     }
 
     #[test]
-    fn test_internally_tagged_enum() {
+    fn internally_tagged_enum() {
         let mut cx = &mut OpgComponents::default();
         assert_eq!(
             serde_yaml::to_string(&InternallyTaggedEnum::get_schema(&mut cx)).unwrap(),
@@ -172,6 +174,7 @@ oneOf:
     properties:
       asd:
         type: integer
+        format: int32
       helloCamelCase:
         $ref: "#/components/schemas/NewType"
       tag:
@@ -207,7 +210,7 @@ oneOf:
     }
 
     #[test]
-    fn test_adjacently_tagged_enum() {
+    fn adjacently_tagged_enum() {
         let mut cx = &mut OpgComponents::default();
         assert_eq!(
             serde_yaml::to_string(&AdjacentlyTaggedEnum::get_schema(&mut cx)).unwrap(),
@@ -243,7 +246,7 @@ required:
     }
 
     #[test]
-    fn test_type_changed_struct() {
+    fn type_changed_field() {
         let mut cx = &mut OpgComponents::default();
         assert_eq!(
             serde_yaml::to_string(&TypeChangedStruct::get_schema(&mut cx)).unwrap(),
@@ -258,7 +261,7 @@ required:
     }
 
     #[test]
-    fn test_tuples() {
+    fn tuples() {
         let mut cx = &mut OpgComponents::default();
         assert_eq!(
             serde_yaml::to_string(&<(String, u64)>::get_schema(&mut cx)).unwrap(),
@@ -267,7 +270,8 @@ type: array
 items:
   oneOf:
     - type: string
-    - type: integer"##
+    - type: integer
+      format: uint64"##
         );
     }
 
@@ -280,7 +284,7 @@ items:
     }
 
     #[test]
-    fn test_inner_type() {
+    fn inner_type() {
         let mut cx = &mut OpgComponents::default();
         assert_eq!(
             serde_yaml::to_string(&StructWithInner::get_schema(&mut cx)).unwrap(),
@@ -290,6 +294,7 @@ properties:
   boxed:
     nullable: true
     type: integer
+    format: int32
   field:
     nullable: true
     type: string
@@ -303,7 +308,7 @@ required:
     }
 
     #[test]
-    fn test_hash_map() {
+    fn hash_map() {
         let mut cx = &mut OpgComponents::default();
         assert_eq!(
             serde_yaml::to_string(&std::collections::HashMap::<&str, i32>::get_schema(&mut cx))
@@ -311,7 +316,8 @@ required:
             r##"---
 type: object
 additionalProperties:
-  type: integer"##
+  type: integer
+  format: int32"##
         );
     }
 
@@ -319,13 +325,14 @@ additionalProperties:
     struct NullableNewtype(Option<i32>);
 
     #[test]
-    fn test_nullable_newtype() {
+    fn nullable_newtype() {
         let mut cx = &mut OpgComponents::default();
         assert_eq!(
             serde_yaml::to_string(&NullableNewtype::get_schema(&mut cx)).unwrap(),
             r##"---
 nullable: true
-type: integer"##
+type: integer
+format: int32"##
         );
     }
 
@@ -336,7 +343,7 @@ type: integer"##
     }
 
     #[test]
-    fn test_nullable_field() {
+    fn nullable_field() {
         let mut cx = &mut OpgComponents::default();
         assert_eq!(
             serde_yaml::to_string(&StructWithNullable::get_schema(&mut cx)).unwrap(),
@@ -346,6 +353,7 @@ properties:
   field:
     nullable: true
     type: integer
+    format: int32
 required:
   - field"##
         );
@@ -356,7 +364,7 @@ required:
         recursive_field: Option<Box<Recursive>>,
     }
 
-    fn test_recursive() {
+    fn recursive_field() {
         let mut cx = &mut OpgComponents::default();
         assert_eq!(
             serde_yaml::to_string(&Recursive::get_schema(&mut cx)).unwrap(),
@@ -391,7 +399,7 @@ required:
     }
 
     #[test]
-    fn test_complex_enum() {
+    fn complex_enum() {
         let mut cx = &mut OpgComponents::default();
         assert_eq!(
             serde_yaml::to_string(&CreditHistoryMetaResponse::get_schema(&mut cx)).unwrap(),
@@ -435,7 +443,7 @@ additionalProperties:
     }
 
     #[test]
-    fn test_serialization() {
+    fn manual_serialization() {
         let model = Model {
             description: Some("Some type".to_owned()),
             data: ModelData::Single(ModelType {
@@ -498,7 +506,7 @@ required:
     }
 
     #[test]
-    fn test_macro() {
+    fn describe_type_macro() {
         let sub = describe_type!(string => {
             description: "Test"
         });
@@ -567,7 +575,7 @@ required:
     }
 
     #[test]
-    fn test_valid_models_context() {
+    fn valid_models_context() {
         let mut cx = OpgComponents::new();
 
         cx.add_model(
@@ -592,7 +600,7 @@ required:
     }
 
     #[test]
-    fn test_invalid_models_context() {
+    fn invalid_models_context() {
         let mut cx = OpgComponents::new();
 
         let invalid_link = "TransactionId";
