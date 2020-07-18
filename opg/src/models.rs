@@ -366,7 +366,7 @@ impl OpgComponents {
         let reference = M::select_reference(self, inline, &params);
         if let ModelReference::Link(link) = &reference {
             if !self.schemas.contains_key(link) {
-                let structure = M::get_structure(self);
+                let structure = M::get_schema(self);
                 self.schemas.insert(link.to_owned(), structure);
             }
         }
@@ -408,15 +408,15 @@ impl OpgComponents {
 }
 
 pub trait OpgModel {
-    fn get_structure(cx: &mut OpgComponents) -> Model;
+    fn get_schema(cx: &mut OpgComponents) -> Model;
 
     fn get_type_name() -> Option<&'static str>;
 
-    fn get_structure_with_params(cx: &mut OpgComponents, params: &ContextParams) -> Model {
-        Self::get_structure(cx).apply_params(params)
+    fn get_schema_with_params(cx: &mut OpgComponents, params: &ContextParams) -> Model {
+        Self::get_schema(cx).apply_params(params)
     }
 
-    #[inline(always)]
+    #[inline]
     fn select_reference(
         cx: &mut OpgComponents,
         inline: bool,
@@ -424,7 +424,7 @@ pub trait OpgModel {
     ) -> ModelReference {
         match Self::get_type_name() {
             Some(link) if !inline => ModelReference::Link(link.to_owned()),
-            _ => ModelReference::Inline(Self::get_structure(cx).apply_params(params)),
+            _ => ModelReference::Inline(Self::get_schema(cx).apply_params(params)),
         }
     }
 }
@@ -448,7 +448,7 @@ pub struct Model {
 }
 
 impl Model {
-    #[inline(always)]
+    #[inline]
     pub fn apply_params(mut self, params: &ContextParams) -> Self {
         if let Some(description) = &params.description {
             self.description = Some(description.clone());
@@ -486,7 +486,7 @@ pub enum ModelData {
 }
 
 impl ModelData {
-    #[inline(always)]
+    #[inline]
     pub fn apply_params(self, params: &ContextParams) -> Self {
         match self {
             ModelData::Single(data) => ModelData::Single(data.apply_params(params)),
@@ -530,7 +530,7 @@ pub struct ModelType {
 }
 
 impl ModelType {
-    #[inline(always)]
+    #[inline]
     pub fn apply_params(mut self, params: &ContextParams) -> Self {
         if let Some(nullable) = params.nullable {
             self.nullable = nullable;
@@ -566,7 +566,7 @@ pub enum ModelTypeDescription {
 }
 
 impl ModelTypeDescription {
-    #[inline(always)]
+    #[inline]
     pub fn apply_params(self, params: &ContextParams) -> Self {
         match self {
             ModelTypeDescription::String(string) => {
@@ -593,7 +593,7 @@ pub struct ModelString {
 }
 
 impl ModelString {
-    #[inline(always)]
+    #[inline]
     pub fn apply_params(mut self, params: &ContextParams) -> Self {
         if let Some(variants) = &params.variants {
             self.variants = Some(variants.clone());
@@ -619,7 +619,7 @@ pub struct ModelSimple {
 }
 
 impl ModelSimple {
-    #[inline(always)]
+    #[inline]
     pub fn apply_params(mut self, params: &ContextParams) -> Self {
         if let Some(format) = &params.format {
             self.format = Some(format.clone());

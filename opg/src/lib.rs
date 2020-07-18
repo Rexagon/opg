@@ -8,34 +8,34 @@ pub use opg_derive::OpgModel;
 pub const OPENAPI_VERSION: &str = "3.0.3";
 pub const SCHEMA_REFERENCE_PREFIX: &str = "#/components/schemas/";
 
-impl_opg_model!(string(always_inline): char);
+impl_opg_model!(string(always_inline, "char"): char);
 impl_opg_model!(string(always_inline): str);
 impl_opg_model!(string(always_inline): String);
 
-impl_opg_model!(integer(always_inline): i8);
-impl_opg_model!(integer(always_inline): u8);
-impl_opg_model!(integer(always_inline): i16);
-impl_opg_model!(integer(always_inline): u16);
-impl_opg_model!(integer(always_inline): i32);
-impl_opg_model!(integer(always_inline): u32);
-impl_opg_model!(integer(always_inline): i64);
-impl_opg_model!(integer(always_inline): u64);
+impl_opg_model!(integer(always_inline, "int8"): i8);
+impl_opg_model!(integer(always_inline, "uint8"): u8);
+impl_opg_model!(integer(always_inline, "int16"): i16);
+impl_opg_model!(integer(always_inline, "uint16"): u16);
+impl_opg_model!(integer(always_inline, "int32"): i32);
+impl_opg_model!(integer(always_inline, "uint32"): u32);
+impl_opg_model!(integer(always_inline, "int64"): i64);
+impl_opg_model!(integer(always_inline, "uint64"): u64);
 impl_opg_model!(integer(always_inline): isize);
 impl_opg_model!(integer(always_inline): usize);
 
-impl_opg_model!(number(always_inline): f32);
-impl_opg_model!(number(always_inline): f64);
+impl_opg_model!(number(always_inline, "float"): f32);
+impl_opg_model!(number(always_inline, "double"): f64);
 
 impl_opg_model!(boolean(always_inline): bool);
 
-impl_opg_model!(integer(always_inline): std::sync::atomic::AtomicI8);
-impl_opg_model!(integer(always_inline): std::sync::atomic::AtomicU8);
-impl_opg_model!(integer(always_inline): std::sync::atomic::AtomicI16);
-impl_opg_model!(integer(always_inline): std::sync::atomic::AtomicU16);
-impl_opg_model!(integer(always_inline): std::sync::atomic::AtomicI32);
-impl_opg_model!(integer(always_inline): std::sync::atomic::AtomicU32);
-impl_opg_model!(integer(always_inline): std::sync::atomic::AtomicI64);
-impl_opg_model!(integer(always_inline): std::sync::atomic::AtomicU64);
+impl_opg_model!(integer(always_inline, "int8"): std::sync::atomic::AtomicI8);
+impl_opg_model!(integer(always_inline, "uint8"): std::sync::atomic::AtomicU8);
+impl_opg_model!(integer(always_inline, "int16"): std::sync::atomic::AtomicI16);
+impl_opg_model!(integer(always_inline, "uint16"): std::sync::atomic::AtomicU16);
+impl_opg_model!(integer(always_inline, "int32"): std::sync::atomic::AtomicI32);
+impl_opg_model!(integer(always_inline, "uint32"): std::sync::atomic::AtomicU32);
+impl_opg_model!(integer(always_inline, "int64"): std::sync::atomic::AtomicI64);
+impl_opg_model!(integer(always_inline, "uint64"): std::sync::atomic::AtomicU64);
 impl_opg_model!(integer(always_inline): std::sync::atomic::AtomicIsize);
 impl_opg_model!(integer(always_inline): std::sync::atomic::AtomicUsize);
 
@@ -86,7 +86,7 @@ impl_opg_model!(generic_dictionary: std::collections::BTreeMap<K, T>);
 
 #[cfg(feature = "uuid")]
 impl OpgModel for uuid::Uuid {
-    fn get_structure(_: &mut OpgComponents) -> Model {
+    fn get_schema(_: &mut OpgComponents) -> Model {
         Model {
             description: Some("UUID ver. 4 [rfc](https://tools.ietf.org/html/rfc4122)".to_owned()),
             data: ModelData::Single(ModelType {
@@ -102,20 +102,20 @@ impl OpgModel for uuid::Uuid {
         }
     }
 
-    #[inline(always)]
-    fn select_reference(cx: &mut OpgComponents, _: bool, params: &ContextParams) -> ModelReference {
-        ModelReference::Inline(Self::get_structure(cx).apply_params(params))
-    }
-
-    #[inline(always)]
+    #[inline]
     fn get_type_name() -> Option<&'static str> {
         None
+    }
+
+    #[inline]
+    fn select_reference(cx: &mut OpgComponents, _: bool, params: &ContextParams) -> ModelReference {
+        ModelReference::Inline(Self::get_schema(cx).apply_params(params))
     }
 }
 
 #[cfg(feature = "chrono")]
 impl OpgModel for chrono::NaiveDateTime {
-    fn get_structure(_: &mut OpgComponents) -> Model {
+    fn get_schema(_: &mut OpgComponents) -> Model {
         Model {
             description: Some("Datetime".to_owned()),
             data: ModelData::Single(ModelType {
@@ -123,7 +123,7 @@ impl OpgModel for chrono::NaiveDateTime {
                 type_description: ModelTypeDescription::String(ModelString {
                     variants: None,
                     data: ModelSimple {
-                        format: Some("YYYY-MM-DDThh:mm:ss.sTZD".to_owned()),
+                        format: Some("date".to_owned()),
                         example: Some("2020-06-26T14:04:20.730045106Z".to_owned()),
                     },
                 }),
@@ -131,13 +131,13 @@ impl OpgModel for chrono::NaiveDateTime {
         }
     }
 
-    #[inline(always)]
-    fn select_reference(cx: &mut OpgComponents, _: bool, params: &ContextParams) -> ModelReference {
-        ModelReference::Inline(Self::get_structure(cx).apply_params(params))
-    }
-
-    #[inline(always)]
+    #[inline]
     fn get_type_name() -> Option<&'static str> {
         None
+    }
+
+    #[inline]
+    fn select_reference(cx: &mut OpgComponents, _: bool, params: &ContextParams) -> ModelReference {
+        ModelReference::Inline(Self::get_schema(cx).apply_params(params))
     }
 }

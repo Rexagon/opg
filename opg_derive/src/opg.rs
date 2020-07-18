@@ -383,7 +383,7 @@ fn serialize_internal_tagged_enum(
                     let context_params = ContextParams::from(&field.attrs).or(&variant.attrs).tokenize();
 
                     quote! {
-                        <#type_name as _opg::OpgModel>::get_structure_with_params(cx, &#context_params)
+                        <#type_name as _opg::OpgModel>::get_schema_with_params(cx, &#context_params)
                     }
                 }
                 StructStyle::Struct => {
@@ -503,7 +503,7 @@ fn serialize_newtype_struct(container: &Container, field: &Field) -> proc_macro2
             let context_params = context_params.tokenize();
 
             quote! {
-                <#type_name as _opg::OpgModel>::get_structure_with_params(cx, &#context_params)
+                <#type_name as _opg::OpgModel>::get_schema_with_params(cx, &#context_params)
             }
         }
     };
@@ -739,19 +739,19 @@ fn implement_type(
 ) -> proc_macro2::TokenStream {
     let inline = if inline {
         quote! {
-            #[inline(always)]
+            #[inline]
             fn get_type_name() -> Option<&'static str> {
                 None
             }
 
-            #[inline(always)]
+            #[inline]
             fn select_reference(cx: &mut _opg::OpgComponents, _: bool, params: &_opg::ContextParams) -> _opg::ModelReference {
-                _opg::ModelReference::Inline(Self::get_structure(cx).apply_params(params))
+                _opg::ModelReference::Inline(Self::get_schema(cx).apply_params(params))
             }
         }
     } else {
         quote! {
-            #[inline(always)]
+            #[inline]
             fn get_type_name() -> Option<&'static str> {
                 Some(stringify!(#type_name))
             }
@@ -760,7 +760,7 @@ fn implement_type(
 
     quote! {
         impl _opg::OpgModel for #type_name {
-            fn get_structure(cx: &mut _opg::OpgComponents) -> _opg::Model {
+            fn get_schema(cx: &mut _opg::OpgComponents) -> _opg::Model {
                 #body
             }
 

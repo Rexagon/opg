@@ -167,14 +167,14 @@ macro_rules! impl_opg_model(
         where
             T: $crate::OpgModel,
         {
-            fn get_structure(cx: &mut $crate::OpgComponents) -> $crate::Model {
-                <T as $crate::OpgModel>::get_structure_with_params(cx, &$crate::ContextParams {
+            fn get_schema(cx: &mut $crate::OpgComponents) -> $crate::Model {
+                <T as $crate::OpgModel>::get_schema_with_params(cx, &$crate::ContextParams {
                     nullable: Some(true),
                     ..Default::default()
                 })
             }
 
-            #[inline(always)]
+            #[inline]
             fn get_type_name() -> Option<&'static str> {
                 <T as $crate::OpgModel>::get_type_name()
             }
@@ -186,11 +186,11 @@ macro_rules! impl_opg_model(
         where
             T: $crate::OpgModel,
         {
-            fn get_structure(cx: &mut $crate::OpgComponents) -> $crate::Model {
-                <T as $crate::OpgModel>::get_structure(cx)
+            fn get_schema(cx: &mut $crate::OpgComponents) -> $crate::Model {
+                <T as $crate::OpgModel>::get_schema(cx)
             }
 
-            #[inline(always)]
+            #[inline]
             fn get_type_name() -> Option<&'static str> {
                 <T as $crate::OpgModel>::get_type_name()
             }
@@ -202,7 +202,7 @@ macro_rules! impl_opg_model(
         where
             $($type : $crate::OpgModel),*
         {
-            fn get_structure(cx: &mut $crate::OpgComponents) -> $crate::Model {
+            fn get_schema(cx: &mut $crate::OpgComponents) -> $crate::Model {
                 let item_model = $crate::Model {
                     description: None,
                     data: $crate::ModelData::OneOf($crate::ModelOneOf {
@@ -217,12 +217,12 @@ macro_rules! impl_opg_model(
                 })
             }
 
-            #[inline(always)]
+            #[inline]
             fn select_reference(cx: &mut $crate::OpgComponents, _: bool, params: &$crate::ContextParams) -> $crate::ModelReference {
-                $crate::ModelReference::Inline(Self::get_structure(cx).apply_params(params))
+                $crate::ModelReference::Inline(Self::get_schema(cx).apply_params(params))
             }
 
-            #[inline(always)]
+            #[inline]
             fn get_type_name() -> Option<&'static str> {
                 None
             }
@@ -235,7 +235,7 @@ macro_rules! impl_opg_model(
         where
             T: $crate::OpgModel,
         {
-            fn get_structure(cx: &mut $crate::OpgComponents) -> $crate::Model {
+            fn get_schema(cx: &mut $crate::OpgComponents) -> $crate::Model {
                 Model {
                     description: None,
                     data: $crate::ModelData::Single($crate::ModelType {
@@ -247,12 +247,12 @@ macro_rules! impl_opg_model(
                 }
             }
 
-            #[inline(always)]
+            #[inline]
             fn select_reference(cx: &mut $crate::OpgComponents, _: bool, params: &$crate::ContextParams) -> $crate::ModelReference {
-                $crate::ModelReference::Inline(Self::get_structure(cx).apply_params(params))
+                $crate::ModelReference::Inline(Self::get_schema(cx).apply_params(params))
             }
 
-            #[inline(always)]
+            #[inline]
             fn get_type_name() -> Option<&'static str> {
                 None
             }
@@ -265,7 +265,7 @@ macro_rules! impl_opg_model(
             T: $crate::OpgModel,
             K: serde::ser::Serialize,
         {
-            fn get_structure(cx: &mut $crate::OpgComponents) -> $crate::Model {
+            fn get_schema(cx: &mut $crate::OpgComponents) -> $crate::Model {
                 Model {
                     description: None,
                     data: $crate::ModelData::Single($crate::ModelType {
@@ -278,43 +278,47 @@ macro_rules! impl_opg_model(
                 }
             }
 
-            #[inline(always)]
+            #[inline]
             fn select_reference(cx: &mut $crate::OpgComponents, _: bool, params: &$crate::ContextParams) -> $crate::ModelReference {
-                $crate::ModelReference::Inline(Self::get_structure(cx).apply_params(params))
+                $crate::ModelReference::Inline(Self::get_schema(cx).apply_params(params))
             }
 
-            #[inline(always)]
+            #[inline]
             fn get_type_name() -> Option<&'static str> {
                 None
             }
         }
     };
 
-    ($serialized_type:ident: $($type:tt)+) => {
+    ($serialized_type:ident$(($format:literal))?: $($type:tt)+ ) => {
         impl $crate::OpgModel for $($type)+ {
-            fn get_structure(cx: &mut $crate::OpgComponents) -> Model {
-                describe_type!($serialized_type => {})
+            fn get_schema(cx: &mut $crate::OpgComponents) -> Model {
+                describe_type!($serialized_type => {
+                    $(format: $format)?
+                })
             }
 
-            #[inline(always)]
+            #[inline]
             fn get_type_name() -> Option<&'static str> {
                 <T as $crate::OpgModel>::get_type_name()
             }
         }
     };
 
-    ($serialized_type:ident(always_inline): $($type:tt)+) => {
+    ($serialized_type:ident(always_inline$(, $format:literal)?): $($type:tt)+) => {
         impl $crate::OpgModel for $($type)+ {
-            fn get_structure(_: &mut $crate::OpgComponents) -> Model {
-                describe_type!($serialized_type => {})
+            fn get_schema(_: &mut $crate::OpgComponents) -> Model {
+                describe_type!($serialized_type => {
+                    $(format: $format)?
+                })
             }
 
-            #[inline(always)]
+            #[inline]
             fn select_reference(cx: &mut $crate::OpgComponents, _: bool, params: &$crate::ContextParams) -> $crate::ModelReference {
-                $crate::ModelReference::Inline(Self::get_structure(cx).apply_params(params))
+                $crate::ModelReference::Inline(Self::get_schema(cx).apply_params(params))
             }
 
-            #[inline(always)]
+            #[inline]
             fn get_type_name() -> Option<&'static str> {
                 None
             }
