@@ -11,6 +11,7 @@ include = ["src/**/*.rs", "README.md", "LICENSE"]
 edition = "2018"
 
 [dependencies]
+http = "0.2"
 opg_derive = { version = "=0.0.23", path = "../opg_derive" }
 serde = { version = "1", features = ["derive"] }
 either = "1.5"

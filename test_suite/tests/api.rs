@@ -1,12 +1,12 @@
 #[allow(dead_code)]
 mod tests {
     use opg::*;
-    use serde::Serialize;
+    use serde::{Serialize, Deserialize};
 
-    #[derive(Serialize, opg::OpgModel)]
+    #[derive(Serialize, Deserialize, OpgModel)]
     #[serde(rename_all = "camelCase")]
-    #[opg("New type description")]
-    enum SuperResponse {
+    #[opg("Simple enum")]
+    enum SimpleEnum {
         Test,
         Another,
         Yay,
@@ -15,13 +15,13 @@ mod tests {
     mod request {
         use super::*;
 
-        #[derive(Serialize, opg::OpgModel)]
+        #[derive(Serialize, OpgModel)]
         pub struct InModule {
             field: String,
             second: Test,
         }
 
-        #[derive(Serialize, opg::OpgModel)]
+        #[derive(Serialize, OpgModel)]
         pub struct Test {
             another_field: Option<String>,
         }
@@ -63,7 +63,7 @@ mod tests {
                             test_auth && "basicAuth"
                         },
                         body: request::InModule,
-                        200("Ok"): std::vec::Vec<String>
+                        200: std::vec::Vec<String>
                     }
                 },
                 ("hello" / "world" / { paramTest: String }): {
@@ -85,7 +85,7 @@ mod tests {
                                 description: "Test",
                             },
                         },
-                        200("Ok"): String
+                        200("Custom response desc"): String
                     },
                     POST: {
                         tags: {admin},
@@ -94,7 +94,7 @@ mod tests {
                             schema: String,
                             required: true
                         },
-                        200("Ok"): SuperResponse,
+                        200: SimpleEnum,
                     }
                 }
             }
@@ -128,7 +128,7 @@ paths:
               $ref: "#/components/schemas/InModule"
       responses:
         200:
-          description: Ok
+          description: OK
           content:
             application/json:
               schema:
@@ -145,7 +145,7 @@ paths:
       description: Small description
       responses:
         200:
-          description: Ok
+          description: Custom response desc
           content:
             application/json:
               schema:
@@ -169,11 +169,11 @@ paths:
               type: string
       responses:
         200:
-          description: Ok
+          description: OK
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SuperResponse"
+                $ref: "#/components/schemas/SimpleEnum"
     parameters:
       - name: asd
         in: header
@@ -208,8 +208,8 @@ components:
       required:
         - field
         - second
-    SuperResponse:
-      description: New type description
+    SimpleEnum:
+      description: Simple enum
       type: string
       enum:
         - test

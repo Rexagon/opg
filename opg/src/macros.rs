@@ -1,3 +1,5 @@
+pub use http;
+
 pub trait FromStrangeTuple<T> {
     fn extract(self) -> Option<T>;
 }
@@ -42,7 +44,7 @@ macro_rules! describe_type(
                 nullable: false,
                 type_description: $crate::ModelTypeDescription::String($crate::ModelString {
                     variants: $crate::macros::FromStrangeTuple::extract(($(vec![$($variants.to_string()),*],)?)),
-                    data: ModelSimple {
+                    data: $crate::ModelSimple {
                         format: $crate::macros::FromStrangeTuple::extract(($($format.to_string(),)?)),
                         example: $crate::macros::FromStrangeTuple::extract(($($example.to_string(),)?)),
                     }
@@ -499,9 +501,15 @@ macro_rules! describe_api {
         });
         describe_api!(@opg_path_value_operation_properties $result $context $($other)*)
     };
-    (@opg_path_value_operation_properties $result:ident $context:ident $response:literal($description:literal): $type:path, $($other:tt)*) => {
+    (@opg_path_value_operation_properties $result:ident $context:ident $response:literal$(($description:literal))?: $type:path, $($other:tt)*) => {
         $context.responses.insert($response, $crate::models::Response {
-            description: $description.to_owned(),
+            description: $crate::macros::FromStrangeTuple::extract(($($description.to_owned(),)?)).unwrap_or_else(||
+                $crate::macros::http::StatusCode::from_u16($response)
+                    .ok()
+                    .and_then(|status| status.canonical_reason())
+                    .map(ToString::to_string)
+                    .unwrap_or_else(String::new)
+            ),
             schema: $result.components.mention_schema::<$type>(false, &Default::default())
         });
         describe_api!(@opg_path_value_operation_properties $result $context $($other)*)

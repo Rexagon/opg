@@ -17,23 +17,105 @@
     </p>
 </p>
 
-#### Example
+#### Example:
+> Or see more [here](https://github.com/Rexagon/opg/tree/master/test_suite/tests)
 
 ```rust
 use opg::*;
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 
-#[derive(Debug, Clone, Serialize, OpgModel)]
+#[derive(Serialize, Deserialize, OpgModel)]
 #[serde(rename_all = "camelCase")]
-#[opg("New type description", string)]
-enum SuperResponse {
+#[opg("Simple enum")]
+enum SimpleEnum {
     Test,
     Another,
     Yay,
 }
 
+#[derive(Serialize, Deserialize, OpgModel)]
+#[opg("newtype string", format = "id", example = "abcd0001")]
+struct NewType(String);
+
+#[derive(Serialize, Deserialize, OpgModel)]
+struct SimpleStruct {
+    first_field: i32,
+    #[opg("Field description")]
+    second: String,
+}
+
+#[derive(Serialize, Deserialize, OpgModel)]
+#[serde(rename_all = "kebab-case")]
+enum ExternallyTaggedEnum {
+    Test(String),
+    AnotherTest(String, #[opg("Second")] String),
+}
+
+#[derive(Serialize, Deserialize, OpgModel)]
+#[serde(untagged)]
+enum UntaggedEnum {
+    First {
+        value: NewType,
+    },
+    #[opg("Variant description")]
+    Second {
+        #[opg("Inlined struct", inline)]
+        another: SimpleStruct,
+    },
+}
+
+#[derive(Serialize, Deserialize, OpgModel)]
+#[serde(tag = "tag", rename_all = "lowercase")]
+enum InternallyTaggedEnum {
+    First(SimpleStruct),
+    Second { field: String },
+}
+
+#[derive(Serialize, Deserialize, OpgModel)]
+#[serde(tag = "tag", content = "content", rename_all = "lowercase")]
+enum AdjacentlyTaggedEnum {
+    First(String),
+    Second(NewType, NewType),
+}
+
+#[derive(Serialize, Deserialize, OpgModel)]
+#[serde(rename_all = "camelCase")]
+struct TypeChangedStruct {
+    #[serde(with = "chrono::naive::serde::ts_milliseconds")]
+    #[opg("UTC timestamp in milliseconds", integer, format = "int64")]
+    pub timestamp: chrono::NaiveDateTime,
+}
+
+#[derive(Serialize, Deserialize, OpgModel)]
+struct StructWithComplexObjects {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[opg(optional)]
+    super_optional: Option<Option<String>>,
+    field: Option<String>,
+    boxed: Box<Option<i32>>,
+}
+
+#[derive(Serialize, OpgModel)]
+struct GenericStructWithRef<'a, T> {
+    message: &'a str,
+    test: T,
+}
+
+#[derive(Serialize, OpgModel)]
+struct SuperResponse {
+    simple_enum: SimpleEnum,
+    #[serde(rename = "new_type")]
+    newtype: NewType,
+    externally_tagged_enum: ExternallyTaggedEnum,
+    untagged_enum: UntaggedEnum,
+    internally_tagged_enum: InternallyTaggedEnum,
+    adjacently_tagged_enum: AdjacentlyTaggedEnum,
+    type_changed_struct: TypeChangedStruct,
+    struct_with_complex_objects: StructWithComplexObjects,
+}
+
 #[test]
-fn expands_normally() {
+fn print_api() {
     let test = describe_api! {
         info: {
             title: "My super API",
@@ -43,6 +125,12 @@ fn expands_normally() {
         servers: {
             "https://my.super.server.com/v1",
         },
+        security_schemes: {
+            (http "bearerAuth"): {
+                scheme: Bearer,
+                bearer_format: "JWT",
+            },
+        },
         paths: {
             ("hello" / "world" / { paramTest: String }): {
                 summary: "Some test group of requests",
@@ -51,7 +139,7 @@ fn expands_normally() {
                     (header "x-request-id"): {
                         description: "Test",
                         required: true,
-                    }
+                    },
                 },
                 GET: {
                     tags: {internal},
@@ -61,17 +149,18 @@ fn expands_normally() {
                         (query someParam: u32): {
                             description: "Test",
                         }
-                    }
-                    200: String ("Ok"),
+                    },
+                    200: String,
                 },
                 POST: {
                     tags: {admin},
+                    security: {"basicAuth"},
                     body: {
                         description: "Some interesting description",
-                        schema: String,
+                        schema: GenericStructWithRef<'static, i64>,
                         required: true,
-                    }
-                    200: SuperResponse ("Ok")
+                    },
+                    200: SuperResponse,
                 }
             }
         }
@@ -81,7 +170,8 @@ fn expands_normally() {
 }
 ```
 
-Result:
+<details><summary><b>Result:</b></summary>
+<p>
 
 ```yaml
 ---
@@ -96,27 +186,6 @@ tags:
 servers:
   - url: "https://my.super.server.com/v1"
 paths:
-  /test:
-    post:
-      security:
-        - basicAuth: []
-          test_auth: []
-      requestBody:
-        required: true
-        description: ""
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/InModule"
-      responses:
-        200:
-          description: Ok
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: string
   "/hello/world/{paramTest}":
     summary: Some test group of requests
     description: Another test description
@@ -127,7 +196,7 @@ paths:
       description: Small description
       responses:
         200:
-          description: Ok
+          description: OK
           content:
             application/json:
               schema:
@@ -138,38 +207,32 @@ paths:
           in: query
           schema:
             type: integer
+            format: uint32
     post:
       tags:
         - admin
+      security:
+        - basicAuth: []
       requestBody:
         required: true
         description: Some interesting description
         content:
           application/json:
             schema:
-              type: string
+              $ref: "#/components/schemas/GenericStructWithRef"
       responses:
         200:
-          description: Ok
+          description: OK
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuperResponse"
     parameters:
-      - name: asd
-        in: header
-        required: true
-        schema:
-          type: string
       - name: paramTest
         in: path
         required: true
         schema:
           type: string
-      - name: test
-        in: query
-        schema:
-          type: integer
       - name: x-request-id
         description: Test
         in: header
@@ -178,46 +241,179 @@ paths:
           type: string
 components:
   schemas:
-    InModule:
+    AdjacentlyTaggedEnum:
       type: object
       properties:
-        field:
+        content:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                oneOf:
+                  - $ref: "#/components/schemas/NewType"
+                  - $ref: "#/components/schemas/NewType"
+        tag:
+          description: AdjacentlyTaggedEnum type variant
           type: string
-        second:
-          $ref: "#/components/schemas/Test"
+          enum:
+            - first
+            - second
+          example: first
       required:
-        - field
-        - second
-    SuperResponse:
-      description: New type description
+        - tag
+        - content
+    ExternallyTaggedEnum:
+      type: object
+      additionalProperties:
+        oneOf:
+          - type: string
+          - type: array
+            items:
+              oneOf:
+                - type: string
+                - description: Second
+                  type: string
+    GenericStructWithRef:
+      type: object
+      properties:
+        message:
+          type: string
+        test:
+          type: integer
+          format: int64
+      required:
+        - message
+        - test
+    InternallyTaggedEnum:
+      oneOf:
+        - type: object
+          properties:
+            first_field:
+              type: integer
+              format: int32
+            second:
+              description: Field description
+              type: string
+            tag:
+              description: InternallyTaggedEnum type variant
+              type: string
+              enum:
+                - first
+              example: first
+          required:
+            - first_field
+            - second
+            - tag
+        - type: object
+          properties:
+            field:
+              type: string
+            tag:
+              description: InternallyTaggedEnum type variant
+              type: string
+              enum:
+                - second
+              example: second
+          required:
+            - field
+            - tag
+    NewType:
+      description: newtype string
+      type: string
+      format: id
+      example: abcd0001
+    SimpleEnum:
+      description: Simple enum
       type: string
       enum:
         - test
         - another
         - yay
       example: test
-    Test:
+    StructWithComplexObjects:
       type: object
       properties:
-        another_field:
+        boxed:
+          nullable: true
+          type: integer
+          format: int32
+        field:
+          nullable: true
+          type: string
+        super_optional:
           nullable: true
           type: string
       required:
-        - another_field
+        - field
+        - boxed
+    SuperResponse:
+      type: object
+      properties:
+        adjacently_tagged_enum:
+          $ref: "#/components/schemas/AdjacentlyTaggedEnum"
+        externally_tagged_enum:
+          $ref: "#/components/schemas/ExternallyTaggedEnum"
+        internally_tagged_enum:
+          $ref: "#/components/schemas/InternallyTaggedEnum"
+        new_type:
+          $ref: "#/components/schemas/NewType"
+        simple_enum:
+          $ref: "#/components/schemas/SimpleEnum"
+        struct_with_complex_objects:
+          $ref: "#/components/schemas/StructWithComplexObjects"
+        type_changed_struct:
+          $ref: "#/components/schemas/TypeChangedStruct"
+        untagged_enum:
+          $ref: "#/components/schemas/UntaggedEnum"
+      required:
+        - simple_enum
+        - new_type
+        - externally_tagged_enum
+        - untagged_enum
+        - internally_tagged_enum
+        - adjacently_tagged_enum
+        - type_changed_struct
+        - struct_with_complex_objects
+    TypeChangedStruct:
+      type: object
+      properties:
+        timestamp:
+          description: UTC timestamp in milliseconds
+          type: integer
+          format: int64
+      required:
+        - timestamp
+    UntaggedEnum:
+      oneOf:
+        - type: object
+          properties:
+            value:
+              $ref: "#/components/schemas/NewType"
+          required:
+            - value
+        - description: Variant description
+          type: object
+          properties:
+            another:
+              description: Inlined struct
+              type: object
+              properties:
+                first_field:
+                  type: integer
+                  format: int32
+                second:
+                  description: Field description
+                  type: string
+              required:
+                - first_field
+                - second
+          required:
+            - another
   securitySchemes:
-    ApiKeyAuth:
-      type: apiKey
-      in: query
-      name: X-API-KEY
-    basicAuth:
-      type: http
-      scheme: basic
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-    test_auth:
-      type: apiKey
-      in: query
-      name: X-MY-SUPER-API
 ```
+</p>
+</details>

@@ -1,6 +1,6 @@
 #[allow(dead_code)]
 mod tests {
-    use opg::*;
+    use opg::{OpgModel, Components};
     use serde::Serialize;
 
     #[derive(Serialize, OpgModel)]
@@ -492,6 +492,8 @@ additionalProperties:
 
     #[test]
     fn manual_serialization() {
+        use opg::*;
+
         let model = Model {
             description: Some("Some type".to_owned()),
             data: ModelData::Single(ModelType {
@@ -555,6 +557,8 @@ required:
 
     #[test]
     fn describe_type_macro() {
+        use opg::describe_type;
+
         let sub = describe_type!(string => {
             description: "Test"
         });
@@ -624,6 +628,8 @@ required:
 
     #[test]
     fn valid_models_context() {
+        use opg::describe_type;
+
         let mut cx = Components::new();
 
         cx.add_model(
@@ -649,6 +655,8 @@ required:
 
     #[test]
     fn invalid_models_context() {
+        use opg::describe_type;
+
         let mut cx = Components::new();
 
         let invalid_link = "TransactionId";
