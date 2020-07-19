@@ -184,10 +184,7 @@ pub struct PathValue {
     pub description: Option<String>,
 
     /// A definitions of operations on this path.
-    #[serde(
-        flatten,
-        skip_serializing_if = "BTreeMap::is_empty",
-    )]
+    #[serde(flatten, skip_serializing_if = "BTreeMap::is_empty")]
     pub operations: BTreeMap<HttpMethod, Operation>,
 
     /// A list of parameters that are applicable for all the operations described under this path
@@ -231,7 +228,7 @@ impl HttpMethod {
 impl Serialize for HttpMethod {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer
+        S: Serializer,
     {
         serializer.serialize_str(self.as_str())
     }

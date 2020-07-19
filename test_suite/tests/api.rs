@@ -1,7 +1,7 @@
 #[allow(dead_code)]
 mod tests {
     use opg::*;
-    use serde::{Serialize, Deserialize};
+    use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize, OpgModel)]
     #[serde(rename_all = "camelCase")]
