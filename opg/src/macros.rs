@@ -162,10 +162,10 @@ macro_rules! describe_type(
 
 #[macro_export]
 macro_rules! impl_opg_model(
-    (generic_simple(nullable): $($type:tt)+) => {
+    (generic_simple(nullable$(, ?$sized:ident)?): $($type:tt)+) => {
         impl<T> $crate::OpgModel for $($type)+
         where
-            T: $crate::OpgModel,
+            T: $crate::OpgModel$(+ ?$sized)?,
         {
             fn get_schema(cx: &mut $crate::OpgComponents) -> $crate::Model {
                 <T as $crate::OpgModel>::get_schema_with_params(cx, &$crate::ContextParams {
@@ -181,10 +181,10 @@ macro_rules! impl_opg_model(
         }
     };
 
-    (generic_simple: $($type:tt)+) => {
+    (generic_simple$((?$sized:ident))?: $($type:tt)+) => {
         impl<T> $crate::OpgModel for $($type)+
         where
-            T: $crate::OpgModel,
+            T: $crate::OpgModel$(+ ?$sized)?,
         {
             fn get_schema(cx: &mut $crate::OpgComponents) -> $crate::Model {
                 <T as $crate::OpgModel>::get_schema(cx)

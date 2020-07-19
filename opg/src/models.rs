@@ -361,7 +361,7 @@ impl OpgComponents {
 
     pub fn mention_schema<M>(&mut self, inline: bool, params: &ContextParams) -> ModelReference
     where
-        M: OpgModel,
+        M: OpgModel + ?Sized,
     {
         let reference = M::select_reference(self, inline, &params);
         if let ModelReference::Link(link) = &reference {

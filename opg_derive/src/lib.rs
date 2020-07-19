@@ -4,6 +4,7 @@ extern crate syn;
 
 mod ast;
 mod attr;
+mod bound;
 mod case;
 mod dummy;
 mod opg;

@@ -41,16 +41,17 @@ impl_opg_model!(integer(always_inline): std::sync::atomic::AtomicUsize);
 
 impl_opg_model!(boolean(always_inline): std::sync::atomic::AtomicBool);
 
-impl_opg_model!(generic_simple: &T);
-impl_opg_model!(generic_simple: &mut T);
-impl_opg_model!(generic_simple: (T,));
-impl_opg_model!(generic_simple: Box<T>);
-impl_opg_model!(generic_simple: std::rc::Rc<T>);
-impl_opg_model!(generic_simple: std::sync::Arc<T>);
-impl_opg_model!(generic_simple: std::cell::Cell<T>);
-impl_opg_model!(generic_simple: std::cell::RefCell<T>);
+impl_opg_model!(generic_simple(?Sized): &T);
+impl_opg_model!(generic_simple(?Sized): &mut T);
+impl_opg_model!(generic_simple(?Sized): Box<T>);
+impl_opg_model!(generic_simple(?Sized): std::rc::Rc<T>);
+impl_opg_model!(generic_simple(?Sized): std::sync::Arc<T>);
+impl_opg_model!(generic_simple(?Sized): std::cell::Cell<T>);
+impl_opg_model!(generic_simple(?Sized): std::cell::RefCell<T>);
 
 impl_opg_model!(generic_simple(nullable): Option<T>);
+
+impl_opg_model!(generic_simple: (T,));
 
 impl_opg_model!(generic_tuple: (T1, T2));
 impl_opg_model!(generic_tuple: (T1, T2, T3));

@@ -3,6 +3,7 @@ use quote::quote;
 
 use crate::ast::*;
 use crate::attr::{self, ExplicitModelType, ModelType, TagType};
+use crate::bound;
 use crate::dummy;
 use crate::parsing_context::*;
 
@@ -17,12 +18,33 @@ pub fn impl_derive_opg_model(
     cx.check()?;
 
     let ident = &container.ident;
+    let generics = build_generics(&container);
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
-    let result = serialize_body(&container);
+    let body = serialize_body(&container);
 
-    //println!("{}", result.to_string());
+    let result = quote! {
+        impl #impl_generics _opg::OpgModel for #ident #ty_generics #where_clause {
+            #body
+        }
+    };
+
+    // println!("{}", result.to_string());
 
     Ok(dummy::wrap_in_const("OPG_MODEL", ident, result))
+}
+
+fn build_generics(cont: &Container) -> syn::Generics {
+    let generics = bound::without_default(cont.generics);
+
+    bound::with_bound(
+        cont,
+        &generics,
+        |field, variant| {
+            !field.skip_serializing && variant.map_or(true, |variant| !variant.skip_serializing)
+        },
+        &syn::parse_quote!(_opg::OpgModel),
+    )
 }
 
 fn serialize_body(container: &Container) -> proc_macro2::TokenStream {
@@ -759,13 +781,11 @@ fn implement_type(
     };
 
     quote! {
-        impl _opg::OpgModel for #type_name {
-            fn get_schema(cx: &mut _opg::OpgComponents) -> _opg::Model {
-                #body
-            }
-
-            #inline
+        fn get_schema(cx: &mut _opg::OpgComponents) -> _opg::Model {
+            #body
         }
+
+        #inline
     }
 }
 

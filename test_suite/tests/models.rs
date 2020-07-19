@@ -398,6 +398,54 @@ required:
         },
     }
 
+    #[derive(Debug, Serialize, OpgModel)]
+    #[opg("Test")]
+    struct GenericStruct<T> {
+        body: T,
+    }
+
+    #[test]
+    fn generic_struct() {
+        let mut cx = &mut OpgComponents::default();
+        assert_eq!(
+            serde_yaml::to_string(&GenericStruct::<i32>::get_schema(&mut cx)).unwrap(),
+            r##"---
+description: Test
+type: object
+properties:
+  body:
+    type: integer
+    format: int32
+required:
+  - body"##
+        );
+    }
+
+    #[derive(Debug, Serialize, OpgModel)]
+    struct GenericStructWithRef<'a, T> {
+        message: &'a str,
+        test: T,
+    }
+
+    #[test]
+    fn generic_struct_with_ref() {
+        let mut cx = &mut OpgComponents::default();
+        assert_eq!(
+            serde_yaml::to_string(&GenericStructWithRef::<i32>::get_schema(&mut cx)).unwrap(),
+            r##"---
+type: object
+properties:
+  message:
+    type: string
+  test:
+    type: integer
+    format: int32
+required:
+  - message
+  - test"##
+        );
+    }
+
     #[test]
     fn complex_enum() {
         let mut cx = &mut OpgComponents::default();
