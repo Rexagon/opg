@@ -762,26 +762,26 @@ fn implement_type(
     let inline = if inline {
         quote! {
             #[inline]
-            fn get_type_name() -> Option<&'static str> {
+            fn type_name() -> Option<&'static str> {
                 None
             }
 
             #[inline]
-            fn select_reference(cx: &mut _opg::OpgComponents, _: bool, params: &_opg::ContextParams) -> _opg::ModelReference {
+            fn select_reference(cx: &mut _opg::Components, _: bool, params: &_opg::ContextParams) -> _opg::ModelReference {
                 _opg::ModelReference::Inline(Self::get_schema(cx).apply_params(params))
             }
         }
     } else {
         quote! {
             #[inline]
-            fn get_type_name() -> Option<&'static str> {
+            fn type_name() -> Option<&'static str> {
                 Some(stringify!(#type_name))
             }
         }
     };
 
     quote! {
-        fn get_schema(cx: &mut _opg::OpgComponents) -> _opg::Model {
+        fn get_schema(cx: &mut _opg::Components) -> _opg::Model {
             #body
         }
 

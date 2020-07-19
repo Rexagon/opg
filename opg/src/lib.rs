@@ -87,7 +87,7 @@ impl_opg_model!(generic_dictionary: std::collections::BTreeMap<K, T>);
 
 #[cfg(feature = "uuid")]
 impl OpgModel for uuid::Uuid {
-    fn get_schema(_: &mut OpgComponents) -> Model {
+    fn get_schema(_: &mut Components) -> Model {
         Model {
             description: Some("UUID ver. 4 [rfc](https://tools.ietf.org/html/rfc4122)".to_owned()),
             data: ModelData::Single(ModelType {
@@ -104,19 +104,19 @@ impl OpgModel for uuid::Uuid {
     }
 
     #[inline]
-    fn get_type_name() -> Option<&'static str> {
+    fn type_name() -> Option<&'static str> {
         None
     }
 
     #[inline]
-    fn select_reference(cx: &mut OpgComponents, _: bool, params: &ContextParams) -> ModelReference {
+    fn select_reference(cx: &mut Components, _: bool, params: &ContextParams) -> ModelReference {
         ModelReference::Inline(Self::get_schema(cx).apply_params(params))
     }
 }
 
 #[cfg(feature = "chrono")]
 impl OpgModel for chrono::NaiveDateTime {
-    fn get_schema(_: &mut OpgComponents) -> Model {
+    fn get_schema(_: &mut Components) -> Model {
         Model {
             description: Some("Datetime".to_owned()),
             data: ModelData::Single(ModelType {
@@ -133,12 +133,12 @@ impl OpgModel for chrono::NaiveDateTime {
     }
 
     #[inline]
-    fn get_type_name() -> Option<&'static str> {
+    fn type_name() -> Option<&'static str> {
         None
     }
 
     #[inline]
-    fn select_reference(cx: &mut OpgComponents, _: bool, params: &ContextParams) -> ModelReference {
+    fn select_reference(cx: &mut Components, _: bool, params: &ContextParams) -> ModelReference {
         ModelReference::Inline(Self::get_schema(cx).apply_params(params))
     }
 }

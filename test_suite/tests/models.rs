@@ -13,7 +13,7 @@ mod tests {
 
     #[test]
     fn newtype() {
-        let mut cx = OpgComponents::new();
+        let mut cx = Components::new();
 
         assert_eq!(
             serde_yaml::to_string(&NewType::get_schema(&mut cx)).unwrap(),
@@ -44,7 +44,7 @@ example: 000-000"##
 
     #[test]
     fn simple_struct() {
-        let mut cx = &mut OpgComponents::default();
+        let mut cx = &mut Components::default();
         assert_eq!(
             serde_yaml::to_string(&SimpleStruct::get_schema(&mut cx)).unwrap(),
             r##"---
@@ -71,7 +71,7 @@ required:
 
     #[test]
     fn string_enum() {
-        let mut cx = &mut OpgComponents::default();
+        let mut cx = &mut Components::default();
         assert_eq!(
             serde_yaml::to_string(&StringEnumTest::get_schema(&mut cx)).unwrap(),
             r##"---
@@ -94,7 +94,7 @@ example: first"##
 
     #[test]
     fn externally_enum() {
-        let mut cx = &mut OpgComponents::default();
+        let mut cx = &mut Components::default();
         assert_eq!(
             serde_yaml::to_string(&ExternallyTaggedEnum::get_schema(&mut cx)).unwrap(),
             r##"---
@@ -126,7 +126,7 @@ additionalProperties:
 
     #[test]
     fn untagged_enum() {
-        let mut cx = &mut OpgComponents::default();
+        let mut cx = &mut Components::default();
         assert_eq!(
             serde_yaml::to_string(&UntaggedEnumTest::get_schema(&mut cx)).unwrap(),
             r##"---
@@ -165,7 +165,7 @@ oneOf:
 
     #[test]
     fn internally_tagged_enum() {
-        let mut cx = &mut OpgComponents::default();
+        let mut cx = &mut Components::default();
         assert_eq!(
             serde_yaml::to_string(&InternallyTaggedEnum::get_schema(&mut cx)).unwrap(),
             r##"---
@@ -211,7 +211,7 @@ oneOf:
 
     #[test]
     fn adjacently_tagged_enum() {
-        let mut cx = &mut OpgComponents::default();
+        let mut cx = &mut Components::default();
         assert_eq!(
             serde_yaml::to_string(&AdjacentlyTaggedEnum::get_schema(&mut cx)).unwrap(),
             r##"---
@@ -247,7 +247,7 @@ required:
 
     #[test]
     fn type_changed_field() {
-        let mut cx = &mut OpgComponents::default();
+        let mut cx = &mut Components::default();
         assert_eq!(
             serde_yaml::to_string(&TypeChangedStruct::get_schema(&mut cx)).unwrap(),
             r##"---
@@ -262,7 +262,7 @@ required:
 
     #[test]
     fn tuples() {
-        let mut cx = &mut OpgComponents::default();
+        let mut cx = &mut Components::default();
         assert_eq!(
             serde_yaml::to_string(&<(String, u64)>::get_schema(&mut cx)).unwrap(),
             r##"---
@@ -285,7 +285,7 @@ items:
 
     #[test]
     fn inner_type() {
-        let mut cx = &mut OpgComponents::default();
+        let mut cx = &mut Components::default();
         assert_eq!(
             serde_yaml::to_string(&StructWithInner::get_schema(&mut cx)).unwrap(),
             r##"---
@@ -309,7 +309,7 @@ required:
 
     #[test]
     fn hash_map() {
-        let mut cx = &mut OpgComponents::default();
+        let mut cx = &mut Components::default();
         assert_eq!(
             serde_yaml::to_string(&std::collections::HashMap::<&str, i32>::get_schema(&mut cx))
                 .unwrap(),
@@ -326,7 +326,7 @@ additionalProperties:
 
     #[test]
     fn nullable_newtype() {
-        let mut cx = &mut OpgComponents::default();
+        let mut cx = &mut Components::default();
         assert_eq!(
             serde_yaml::to_string(&NullableNewtype::get_schema(&mut cx)).unwrap(),
             r##"---
@@ -344,7 +344,7 @@ format: int32"##
 
     #[test]
     fn nullable_field() {
-        let mut cx = &mut OpgComponents::default();
+        let mut cx = &mut Components::default();
         assert_eq!(
             serde_yaml::to_string(&StructWithNullable::get_schema(&mut cx)).unwrap(),
             r##"---
@@ -365,7 +365,7 @@ required:
     }
 
     fn recursive_field() {
-        let mut cx = &mut OpgComponents::default();
+        let mut cx = &mut Components::default();
         assert_eq!(
             serde_yaml::to_string(&Recursive::get_schema(&mut cx)).unwrap(),
             r##"---
@@ -406,7 +406,7 @@ required:
 
     #[test]
     fn generic_struct() {
-        let mut cx = &mut OpgComponents::default();
+        let mut cx = &mut Components::default();
         assert_eq!(
             serde_yaml::to_string(&GenericStruct::<i32>::get_schema(&mut cx)).unwrap(),
             r##"---
@@ -429,7 +429,7 @@ required:
 
     #[test]
     fn generic_struct_with_ref() {
-        let mut cx = &mut OpgComponents::default();
+        let mut cx = &mut Components::default();
         assert_eq!(
             serde_yaml::to_string(&GenericStructWithRef::<i32>::get_schema(&mut cx)).unwrap(),
             r##"---
@@ -448,7 +448,7 @@ required:
 
     #[test]
     fn complex_enum() {
-        let mut cx = &mut OpgComponents::default();
+        let mut cx = &mut Components::default();
         assert_eq!(
             serde_yaml::to_string(&CreditHistoryMetaResponse::get_schema(&mut cx)).unwrap(),
             r##"---
@@ -624,7 +624,7 @@ required:
 
     #[test]
     fn valid_models_context() {
-        let mut cx = OpgComponents::new();
+        let mut cx = Components::new();
 
         cx.add_model(
             "TransactionId",
@@ -649,7 +649,7 @@ required:
 
     #[test]
     fn invalid_models_context() {
-        let mut cx = OpgComponents::new();
+        let mut cx = Components::new();
 
         let invalid_link = "TransactionId";
 

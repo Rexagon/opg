@@ -5,38 +5,51 @@ use either::*;
 use serde::ser::{SerializeMap, SerializeSeq};
 use serde::{Serialize, Serializer};
 
+/// OpenAPI Object
+///
+/// [specification](https://swagger.io/specification/#openapi-object)
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct Opg {
-    pub openapi: OpgOpenApi,
-    pub info: OpgInfo,
+    /// Semantic version number of the OpenAPI Specification version
+    pub openapi: OpenApiVersion,
 
+    /// Provides metadata about the API
+    pub info: Info,
+
+    /// A list of tags used by the specification with additional metadata
     #[serde(
         skip_serializing_if = "BTreeMap::is_empty",
         serialize_with = "serialize_tags"
     )]
-    pub tags: BTreeMap<String, OpgTag>,
+    pub tags: BTreeMap<String, Tag>,
 
+    /// An array of Server Objects, which provide connectivity information to a target server
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub servers: Vec<OpgServer>,
+    pub servers: Vec<Server>,
 
+    /// The available paths and operations for the API
     #[serde(
         serialize_with = "serialize_ordered_entries",
         skip_serializing_if = "Vec::is_empty"
     )]
-    pub paths: Vec<(OpgPath, OpgPathValue)>,
+    pub paths: Vec<(Path, PathValue)>,
 
-    pub components: OpgComponents,
+    /// An element to hold various schemas for the specification
+    pub components: Components,
 }
 
+/// OpenAPI version.
+/// 3.0.3 by default
 #[derive(Debug, Clone, Serialize)]
-pub struct OpgOpenApi(String);
+pub struct OpenApiVersion(String);
 
-impl Default for OpgOpenApi {
+impl Default for OpenApiVersion {
     fn default() -> Self {
         Self(crate::OPENAPI_VERSION.to_owned())
     }
 }
 
+/// Serialize slice of tuples as map
 fn serialize_ordered_entries<S, T1, T2>(
     entries: &[(T1, T2)],
     serializer: S,
@@ -55,7 +68,8 @@ where
     ser.end()
 }
 
-fn serialize_tags<S>(tags: &BTreeMap<String, OpgTag>, serializer: S) -> Result<S::Ok, S::Error>
+/// Serialize map of tags as sequence
+fn serialize_tags<S>(tags: &BTreeMap<String, Tag>, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: serde::ser::Serializer,
 {
@@ -78,39 +92,63 @@ where
     ser.end()
 }
 
+/// Info Object
+///
+/// [specification](https://swagger.io/specification/#info-object)
 #[derive(Debug, Clone, Default, Serialize)]
-pub struct OpgInfo {
+pub struct Info {
+    /// The title of the API
     pub title: String,
+
+    /// A short description of the API
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+
+    /// The version of the OpenAPI document
     pub version: String,
 }
 
+/// Tag Object
+///
+/// [specification](https://swagger.io/specification/#tag-object)
 #[derive(Debug, Clone, Default, Serialize)]
-pub struct OpgTag {
+pub struct Tag {
+    /// A short description for the tag
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
 }
 
+/// Server Object
+///
+/// [specification](https://swagger.io/specification/#server-object)
+///
+/// TODO: add variables section
 #[derive(Debug, Clone, Serialize)]
-pub struct OpgServer {
+pub struct Server {
+    /// A URL to the target host
     pub url: String,
+
+    /// An optional string describing the host designated by the URL
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
 }
 
+/// Paths Object key
+///
+/// [specification](https://swagger.io/specification/#paths-object)
 #[derive(Debug, Clone, Serialize)]
-pub struct OpgPath(#[serde(serialize_with = "serialize_path_elements")] pub Vec<OpgPathElement>);
+pub struct Path(#[serde(serialize_with = "serialize_path_elements")] pub Vec<PathElement>);
 
-fn serialize_path_elements<S>(elements: &[OpgPathElement], serializer: S) -> Result<S::Ok, S::Error>
+/// Serialize sequence of path elements as single string
+fn serialize_path_elements<S>(elements: &[PathElement], serializer: S) -> Result<S::Ok, S::Error>
 where
     S: serde::ser::Serializer,
 {
     let mut result = String::new();
 
     for element in elements.iter().map(|element| match element {
-        OpgPathElement::Path(path) => Either::Left(path),
-        OpgPathElement::Parameter(param) => Either::Right(format!("{{{}}}", param)),
+        PathElement::Path(path) => Either::Left(path),
+        PathElement::Parameter(param) => Either::Right(format!("{{{}}}", param)),
     }) {
         write!(&mut result, "/{}", element).unwrap();
     }
@@ -118,114 +156,154 @@ where
     serializer.serialize_str(&result)
 }
 
+/// Paths Object key part.
+///
+/// Describes path part between two '/'.
+///
+/// For example path `/pets/{petId}` is represented by array of values:
+/// `PathElement::Path("pets"), PathElement::Parameter("petId")`
+///
+/// [specification](https://swagger.io/specification/#paths-object)
 #[derive(Debug, Clone)]
-pub enum OpgPathElement {
+pub enum PathElement {
     Path(String),
     Parameter(String),
 }
 
+/// Path Item Object
+///
+/// [specification](https://swagger.io/specification/#path-item-object)
 #[derive(Debug, Clone, Default, Serialize)]
-pub struct OpgPathValue {
+pub struct PathValue {
+    /// An optional, string summary, intended to apply to all operations in this path.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub summary: Option<String>,
+
+    /// An optional, string description, intended to apply to all operations in this path
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+
+    /// A definitions of operations on this path.
     #[serde(
         flatten,
         skip_serializing_if = "BTreeMap::is_empty",
-        serialize_with = "serialize_operations"
     )]
-    pub operations: BTreeMap<OpgHttpMethod, OpgOperation>,
+    pub operations: BTreeMap<HttpMethod, Operation>,
+
+    /// A list of parameters that are applicable for all the operations described under this path
     #[serde(
         skip_serializing_if = "BTreeMap::is_empty",
         serialize_with = "serialize_parameters"
     )]
-    pub parameters: BTreeMap<String, OpgOperationParameter>,
+    pub parameters: BTreeMap<String, OperationParameter>,
 }
 
+/// Path Item Object operation type
+///
+/// [specification](https://swagger.io/specification/#path-item-object)
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
-pub enum OpgHttpMethod {
+pub enum HttpMethod {
     GET,
-    POST,
     PUT,
+    POST,
     DELETE,
+    OPTIONS,
+    HEAD,
+    PATCH,
+    TRACE,
 }
 
-impl OpgHttpMethod {
+impl HttpMethod {
     fn as_str(&self) -> &'static str {
         match self {
-            OpgHttpMethod::GET => "get",
-            OpgHttpMethod::POST => "post",
-            OpgHttpMethod::PUT => "put",
-            OpgHttpMethod::DELETE => "delete",
+            HttpMethod::GET => "get",
+            HttpMethod::PUT => "put",
+            HttpMethod::POST => "post",
+            HttpMethod::DELETE => "delete",
+            HttpMethod::OPTIONS => "options",
+            HttpMethod::HEAD => "head",
+            HttpMethod::PATCH => "patch",
+            HttpMethod::TRACE => "trace",
         }
     }
 }
 
-fn serialize_operations<S>(
-    operations: &BTreeMap<OpgHttpMethod, OpgOperation>,
-    serializer: S,
-) -> Result<S::Ok, S::Error>
-where
-    S: serde::ser::Serializer,
-{
-    let mut ser = serializer.serialize_map(Some(operations.len()))?;
-
-    operations.iter().try_for_each(|(name, operation)| {
-        ser.serialize_entry(&name.as_str().to_ascii_lowercase(), operation)
-    })?;
-
-    ser.end()
+impl Serialize for HttpMethod {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where S: Serializer
+    {
+        serializer.serialize_str(self.as_str())
+    }
 }
 
+/// Operation Object
+///
+/// [specification](https://swagger.io/specification/#operation-object)
 #[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct OpgOperation {
+pub struct Operation {
+    /// A list of tags for API documentation control
+    ///
+    /// Tags can be used for logical grouping of operations by resources or any other qualifier.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
 
+    /// A short summary of what the operation does
     #[serde(skip_serializing_if = "Option::is_none")]
     pub summary: Option<String>,
 
+    /// A verbose explanation of the operation behavior
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
 
+    /// A declaration of which security mechanisms can be used for this operation
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub security: Vec<BTreeMap<String, Vec<String>>>,
 
+    /// The request body applicable for this operation
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub request_body: Option<OpgRequestBody>,
+    pub request_body: Option<RequestBody>,
 
-    pub responses: BTreeMap<u16, OpgResponse>,
+    /// The list of possible responses as they are returned from executing this operation
+    pub responses: BTreeMap<u16, Response>,
 
+    /// A list of parameters that are applicable for this operation
     #[serde(
         skip_serializing_if = "BTreeMap::is_empty",
         serialize_with = "serialize_parameters"
     )]
-    pub parameters: BTreeMap<String, OpgOperationParameter>,
+    pub parameters: BTreeMap<String, OperationParameter>,
 }
 
+/// Request Body Object
+///
+/// [specification](https://swagger.io/specification/#request-body-object)
 #[derive(Debug, Clone)]
-pub struct OpgRequestBody {
+pub struct RequestBody {
+    /// A brief description of the request body
     pub description: Option<String>,
+
+    /// Determines if the request body is required in the request. Defaults to true.
     pub required: bool,
+
+    /// The content of the request body
     pub schema: ModelReference,
 }
 
-impl Serialize for OpgRequestBody {
+impl Serialize for RequestBody {
     fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
     where
         S: Serializer,
     {
         #[derive(Serialize)]
-        struct OpgRequestBodyHelper<'a> {
+        struct RequestBodyHelper<'a> {
             #[serde(skip_serializing_if = "is_false")]
             required: bool,
             description: &'a Option<String>,
             content: ResponseContent<'a>,
         }
 
-        OpgRequestBodyHelper {
+        RequestBodyHelper {
             required: self.required,
             description: &self.description,
             content: ResponseContent {
@@ -238,24 +316,30 @@ impl Serialize for OpgRequestBody {
     }
 }
 
+/// Response Object
+///
+/// [specification](https://swagger.io/specification/#response-object)
 #[derive(Debug, Clone)]
-pub struct OpgResponse {
+pub struct Response {
+    /// A short description of the response
     pub description: String,
+
+    /// Response schema
     pub schema: ModelReference,
 }
 
-impl Serialize for OpgResponse {
+impl Serialize for Response {
     fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
     where
         S: Serializer,
     {
         #[derive(Serialize)]
-        struct OpgResponseHelper<'a> {
+        struct ResponseHelper<'a> {
             description: &'a str,
             content: ResponseContent<'a>,
         }
 
-        OpgResponseHelper {
+        ResponseHelper {
             description: &self.description,
             content: ResponseContent {
                 media_type: ResponseMediaType {
@@ -267,25 +351,30 @@ impl Serialize for OpgResponse {
     }
 }
 
-// helper for serde
+/// helper for serde
 #[allow(clippy::trivially_copy_pass_by_ref)]
 fn is_false(value: &bool) -> bool {
     !*value
 }
 
+/// Response media type.
+///
+/// Currently behaves as a stub with value 'application/json'
 #[derive(Serialize)]
 struct ResponseMediaType<'a> {
     schema: &'a ModelReference,
 }
 
+/// Content Object
 #[derive(Serialize)]
 struct ResponseContent<'a> {
     #[serde(rename = "application/json")]
     media_type: ResponseMediaType<'a>,
 }
 
+/// Serialize map of parameters as sequence
 fn serialize_parameters<S>(
-    parameters: &BTreeMap<String, OpgOperationParameter>,
+    parameters: &BTreeMap<String, OperationParameter>,
     serializer: S,
 ) -> Result<S::Ok, S::Error>
 where
@@ -293,7 +382,7 @@ where
 {
     #[derive(Serialize)]
     #[serde(rename_all = "camelCase")]
-    struct OpgOperationParameterHelper<'a> {
+    struct OperationParameterHelper<'a> {
         name: &'a str,
         #[serde(skip_serializing_if = "Option::is_none")]
         description: &'a Option<String>,
@@ -308,7 +397,7 @@ where
     let mut ser = serializer.serialize_seq(Some(parameters.len()))?;
 
     parameters.iter().try_for_each(|(name, operation)| {
-        ser.serialize_element(&OpgOperationParameterHelper {
+        ser.serialize_element(&OperationParameterHelper {
             name,
             description: &operation.description,
             parameter_in: operation.parameter_in,
@@ -320,16 +409,30 @@ where
     ser.end()
 }
 
+/// Parameter Object
+///
+/// [specification](https://swagger.io/specification/#parameter-object)
 #[derive(Debug, Clone)]
-pub struct OpgOperationParameter {
+pub struct OperationParameter {
+    /// A brief description of the parameter
     pub description: Option<String>,
+
+    /// The location of the parameter
     pub parameter_in: ParameterIn,
+
+    /// Determines whether this parameter is mandatory
+    ///
+    /// If the parameter location is "path", this property is REQUIRED and its value MUST be true.
+    /// Otherwise, the property MAY be included and its default value is false.
     pub required: bool,
+
+    /// The schema defining the type used for the parameter
     pub schema: Option<ModelReference>,
 }
 
+/// The location of the parameter
 #[derive(Debug, Clone, Copy, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "lowercase")]
 pub enum ParameterIn {
     Query,
     Header,
@@ -337,28 +440,33 @@ pub enum ParameterIn {
     Cookie,
 }
 
+/// Components Object
+///
+/// [specification](https://swagger.io/specification/#components-object)
 #[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct OpgComponents {
+pub struct Components {
+    /// An object to hold reusable Schema Objects
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub schemas: BTreeMap<String, Model>,
+
+    /// An object to hold reusable Security Scheme Objects
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub security_schemes: BTreeMap<String, SecurityScheme>,
 }
 
-impl OpgComponents {
+impl Components {
     pub fn new() -> Self {
-        Self {
-            schemas: BTreeMap::new(),
-            security_schemes: BTreeMap::new(),
-        }
+        Self::default()
     }
 
+    /// Check name occurrence in schemas
     #[inline]
     pub fn contains_model(&self, name: &str) -> bool {
         self.schemas.contains_key(name)
     }
 
+    /// Insert model into schema and return it's reference
     pub fn mention_schema<M>(&mut self, inline: bool, params: &ContextParams) -> ModelReference
     where
         M: OpgModel + ?Sized,
@@ -373,6 +481,7 @@ impl OpgComponents {
         reference
     }
 
+    /// Insert security scheme and return it's name
     pub fn mention_security_scheme<T>(&mut self, name: String, security_scheme: &T) -> String
     where
         T: Clone,
@@ -385,6 +494,7 @@ impl OpgComponents {
         name
     }
 
+    /// Verify schemas references
     #[allow(dead_code)]
     pub fn verify_schemas(&self) -> Result<(), String> {
         let cx = TraverseContext(&self.schemas);
@@ -395,6 +505,7 @@ impl OpgComponents {
             .map_err(|first_occurrence| first_occurrence.to_owned())
     }
 
+    /// Manually insert model with specified name
     pub fn add_model<N>(&mut self, name: N, model: Model)
     where
         N: ToString,
@@ -407,47 +518,70 @@ impl OpgComponents {
     }
 }
 
+/// Trait for schema objects generation
 pub trait OpgModel {
-    fn get_schema(cx: &mut OpgComponents) -> Model;
+    /// Get schema for this type
+    fn get_schema(cx: &mut Components) -> Model;
 
-    fn get_type_name() -> Option<&'static str>;
+    /// Get name of this type
+    fn type_name() -> Option<&'static str>;
 
-    fn get_schema_with_params(cx: &mut OpgComponents, params: &ContextParams) -> Model {
+    /// Get schema for this type with context parameters applied
+    fn get_schema_with_params(cx: &mut Components, params: &ContextParams) -> Model {
         Self::get_schema(cx).apply_params(params)
     }
 
+    /// Get link or inlined schema with context parameters applied
     #[inline]
     fn select_reference(
-        cx: &mut OpgComponents,
+        cx: &mut Components,
         inline: bool,
         params: &ContextParams,
     ) -> ModelReference {
-        match Self::get_type_name() {
+        match Self::type_name() {
             Some(link) if !inline => ModelReference::Link(link.to_owned()),
             _ => ModelReference::Inline(Self::get_schema(cx).apply_params(params)),
         }
     }
 }
 
+/// Context parameters
 #[derive(Default)]
 pub struct ContextParams {
+    /// Brief description of this object inplace
     pub description: Option<String>,
+
+    /// A true value adds "null" to the allowed type specified by the type keyword, only if type is
+    /// explicitly defined within the same Schema Object
     pub nullable: Option<bool>,
+
+    /// Possible enum variants of this string inplace
     pub variants: Option<Vec<String>>,
+
+    /// Data type format inplace
     pub format: Option<String>,
+
+    /// Example for this object inplace
     pub example: Option<String>,
 }
 
+/// Schema Object
+///
+/// [specification](https://swagger.io/specification/#schema-object)
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Model {
+    /// Brief description of this object
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+
+    /// Type specific data
     #[serde(flatten)]
     pub data: ModelData,
 }
 
 impl Model {
+    /// Apply context params for this object
     #[inline]
     pub fn apply_params(mut self, params: &ContextParams) -> Self {
         if let Some(description) = &params.description {
@@ -457,10 +591,7 @@ impl Model {
         self
     }
 
-    fn traverse<'a>(&'a self, cx: TraverseContext<'a>) -> Result<(), &'a str> {
-        self.data.traverse(cx)
-    }
-
+    /// Try merge other model into this object
     pub fn try_merge(&mut self, other: Model) -> Result<(), ()> {
         match &mut self.data {
             ModelData::Single(ModelType {
@@ -476,8 +607,14 @@ impl Model {
             _ => Err(()),
         }
     }
+
+    /// Check links
+    fn traverse<'a>(&'a self, cx: TraverseContext<'a>) -> Result<(), &'a str> {
+        self.data.traverse(cx)
+    }
 }
 
+/// Schema object representation
 #[derive(Debug, Clone, Serialize)]
 #[serde(untagged, rename_all = "camelCase")]
 pub enum ModelData {
@@ -486,6 +623,7 @@ pub enum ModelData {
 }
 
 impl ModelData {
+    /// Apply context params for this object
     #[inline]
     pub fn apply_params(self, params: &ContextParams) -> Self {
         match self {
@@ -494,6 +632,7 @@ impl ModelData {
         }
     }
 
+    /// Check links
     fn traverse<'a>(&'a self, cx: TraverseContext<'a>) -> Result<(), &'a str> {
         match self {
             ModelData::Single(single) => single.traverse(cx),
@@ -502,6 +641,7 @@ impl ModelData {
     }
 }
 
+/// oneOf
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelOneOf {
@@ -509,6 +649,7 @@ pub struct ModelOneOf {
 }
 
 impl ModelOneOf {
+    /// Check links
     fn traverse<'a>(&'a self, cx: TraverseContext<'a>) -> Result<(), &'a str> {
         self.one_of.iter().try_for_each(|item| item.traverse(cx))
     }
@@ -520,16 +661,21 @@ impl From<ModelOneOf> for ModelData {
     }
 }
 
+/// type
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelType {
+    /// Whether this type can have `null` value
     #[serde(skip_serializing_if = "is_false")]
     pub nullable: bool,
+
+    /// Type description
     #[serde(flatten)]
     pub type_description: ModelTypeDescription,
 }
 
 impl ModelType {
+    /// Apply context params for this object
     #[inline]
     pub fn apply_params(mut self, params: &ContextParams) -> Self {
         if let Some(nullable) = params.nullable {
@@ -539,6 +685,7 @@ impl ModelType {
         self
     }
 
+    /// Check links
     fn traverse<'a>(&'a self, cx: TraverseContext<'a>) -> Result<(), &'a str> {
         match &self.type_description {
             ModelTypeDescription::Array(array) => array.traverse(cx),
@@ -554,6 +701,9 @@ impl From<ModelType> for ModelData {
     }
 }
 
+/// Data Type
+///
+/// [specification](https://swagger.io/specification/#data-types)
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum ModelTypeDescription {
@@ -566,6 +716,7 @@ pub enum ModelTypeDescription {
 }
 
 impl ModelTypeDescription {
+    /// Apply context params for this object
     #[inline]
     pub fn apply_params(self, params: &ContextParams) -> Self {
         match self {
@@ -583,16 +734,21 @@ impl ModelTypeDescription {
     }
 }
 
+/// String data type
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelString {
+    /// Possible values
     #[serde(rename = "enum", skip_serializing_if = "Option::is_none")]
     pub variants: Option<Vec<String>>,
+
+    /// Other type description data
     #[serde(flatten)]
     pub data: ModelSimple,
 }
 
 impl ModelString {
+    /// Apply context params for this object
     #[inline]
     pub fn apply_params(mut self, params: &ContextParams) -> Self {
         if let Some(variants) = &params.variants {
@@ -609,16 +765,21 @@ impl From<ModelString> for ModelTypeDescription {
     }
 }
 
+/// Simple model type description
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelSimple {
+    /// Value format
     #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<String>,
+
+    /// Example value
     #[serde(skip_serializing_if = "Option::is_none")]
     pub example: Option<String>,
 }
 
 impl ModelSimple {
+    /// Apply context params for this object
     #[inline]
     pub fn apply_params(mut self, params: &ContextParams) -> Self {
         if let Some(format) = &params.format {
@@ -631,6 +792,7 @@ impl ModelSimple {
     }
 }
 
+/// Array type description
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelArray {
@@ -638,6 +800,7 @@ pub struct ModelArray {
 }
 
 impl ModelArray {
+    /// Check links
     fn traverse<'a>(&'a self, cx: TraverseContext<'a>) -> Result<(), &'a str> {
         self.items.traverse(cx)
     }
@@ -649,26 +812,25 @@ impl From<ModelArray> for ModelTypeDescription {
     }
 }
 
+/// Object type description
 #[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelObject {
+    /// Object properties
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub properties: BTreeMap<String, ModelReference>,
+
+    /// Additional properties
     #[serde(skip_serializing_if = "Option::is_none")]
     pub additional_properties: Option<Box<ModelReference>>,
+
+    /// Required properties
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub required: Vec<String>,
 }
 
 impl ModelObject {
-    fn traverse<'a>(&'a self, cx: TraverseContext<'a>) -> Result<(), &'a str> {
-        self.properties
-            .iter()
-            .map(|(_, reference)| reference)
-            .chain(self.additional_properties.iter().map(|item| item.as_ref()))
-            .try_for_each(|reference| reference.traverse(cx))
-    }
-
+    /// Manually add property
     pub fn add_property(
         &mut self,
         property: String,
@@ -689,6 +851,7 @@ impl ModelObject {
         Ok(())
     }
 
+    /// Merge other object into self
     pub fn merge(&mut self, another: ModelObject) -> Result<(), ()> {
         another
             .properties
@@ -710,6 +873,15 @@ impl ModelObject {
 
         Ok(())
     }
+
+    /// Check links
+    fn traverse<'a>(&'a self, cx: TraverseContext<'a>) -> Result<(), &'a str> {
+        self.properties
+            .iter()
+            .map(|(_, reference)| reference)
+            .chain(self.additional_properties.iter().map(|item| item.as_ref()))
+            .try_for_each(|reference| reference.traverse(cx))
+    }
 }
 
 impl From<ModelObject> for ModelTypeDescription {
@@ -718,14 +890,19 @@ impl From<ModelObject> for ModelTypeDescription {
     }
 }
 
+/// Model reference
 #[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum ModelReference {
+    /// `$ref: "#/components/schemas/..."`
     #[serde(serialize_with = "serialize_model_reference_link")]
     Link(String),
+
+    /// Inlined model
     Inline(Model),
 }
 
+/// Serialize link as struct with `$ref` field
 fn serialize_model_reference_link<S, N>(name: &N, serializer: S) -> Result<S::Ok, S::Error>
 where
     N: std::fmt::Display,
@@ -740,6 +917,7 @@ where
 }
 
 impl ModelReference {
+    /// Check links
     fn traverse<'a>(&'a self, mut cx: TraverseContext<'a>) -> Result<(), &'a str> {
         match &self {
             ModelReference::Link(ref link) => cx.check(link),
@@ -761,6 +939,9 @@ impl<'a> TraverseContext<'a> {
     }
 }
 
+/// Security Scheme Object
+///
+/// [specification](https://swagger.io/specification/#security-scheme-object)
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase", tag = "type")]
 pub enum SecurityScheme {
@@ -769,6 +950,7 @@ pub enum SecurityScheme {
     // TODO: add `oath2` and `openIdConnect`
 }
 
+/// HTTP security scheme
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase", tag = "scheme")]
 pub enum HttpSecurityScheme {
@@ -790,6 +972,7 @@ pub enum HttpSecuritySchemeKind {
     Bearer,
 }
 
+/// Api key security scheme
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ApiKeySecurityScheme {
@@ -804,4 +987,5 @@ impl From<ApiKeySecurityScheme> for SecurityScheme {
     }
 }
 
+/// Stub for macros
 pub struct ParameterNotSpecified;
