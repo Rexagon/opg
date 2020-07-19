@@ -3,13 +3,16 @@
     <p align="center">Rust OpenAPI 3.0 docs generator</p>
     <p align="center">
         <a href="/LICENSE">
-            <img alt="GitHub" src="https://img.shields.io/github/license/Rexagon/opg?style=flat-square" />
+            <img alt="GitHub" src="https://img.shields.io/github/license/Rexagon/opg" />
         </a>
         <a href="https://github.com/Rexagon/opg/actions?query=workflow%3Amaster">
-            <img alt="GitHub Workflow Status" src="https://img.shields.io/github/workflow/status/Rexagon/opg/master?style=flat-square" />
+            <img alt="GitHub Workflow Status" src="https://img.shields.io/github/workflow/status/Rexagon/opg/master" />
         </a>
         <a href="https://crates.io/crates/opg">
-            <img alt="Crates.io Version" src="https://img.shields.io/crates/v/opg?style=flat-square" />
+            <img alt="Crates.io Version" src="https://img.shields.io/crates/v/opg" />
+        </a>
+        <a href="https://docs.rs/opg">
+            <img alt="Docs.rs" src="https://docs.rs/opg/badge.svg" />
         </a>
     </p>
 </p>

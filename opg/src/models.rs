@@ -57,7 +57,7 @@ fn serialize_ordered_entries<S, T1, T2>(
 where
     T1: Serialize,
     T2: Serialize,
-    S: serde::ser::Serializer,
+    S: Serializer,
 {
     let mut ser = serializer.serialize_map(Some(entries.len()))?;
 
@@ -71,7 +71,7 @@ where
 /// Serialize map of tags as sequence
 fn serialize_tags<S>(tags: &BTreeMap<String, Tag>, serializer: S) -> Result<S::Ok, S::Error>
 where
-    S: serde::ser::Serializer,
+    S: Serializer,
 {
     #[derive(Serialize)]
     pub struct OpgTagHelper<'a> {
@@ -142,7 +142,7 @@ pub struct Path(#[serde(serialize_with = "serialize_path_elements")] pub Vec<Pat
 /// Serialize sequence of path elements as single string
 fn serialize_path_elements<S>(elements: &[PathElement], serializer: S) -> Result<S::Ok, S::Error>
 where
-    S: serde::ser::Serializer,
+    S: Serializer,
 {
     let mut result = String::new();
 
@@ -230,7 +230,8 @@ impl HttpMethod {
 
 impl Serialize for HttpMethod {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where S: Serializer
+    where
+        S: Serializer
     {
         serializer.serialize_str(self.as_str())
     }
@@ -291,7 +292,7 @@ pub struct RequestBody {
 }
 
 impl Serialize for RequestBody {
-    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -329,7 +330,7 @@ pub struct Response {
 }
 
 impl Serialize for Response {
-    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -378,7 +379,7 @@ fn serialize_parameters<S>(
     serializer: S,
 ) -> Result<S::Ok, S::Error>
 where
-    S: serde::ser::Serializer,
+    S: Serializer,
 {
     #[derive(Serialize)]
     #[serde(rename_all = "camelCase")]
@@ -906,7 +907,7 @@ pub enum ModelReference {
 fn serialize_model_reference_link<S, N>(name: &N, serializer: S) -> Result<S::Ok, S::Error>
 where
     N: std::fmt::Display,
-    S: serde::ser::Serializer,
+    S: Serializer,
 {
     let mut ser = serializer.serialize_map(Some(1))?;
     ser.serialize_entry(
