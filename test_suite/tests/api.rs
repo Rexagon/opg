@@ -32,6 +32,7 @@ mod tests {
         let test_auth = ApiKeySecurityScheme {
             parameter_in: ParameterIn::Query,
             name: "X-MY-SUPER-API".to_string(),
+            description: None,
         };
 
         let test = describe_api! {
@@ -47,13 +48,16 @@ mod tests {
                 (http "bearerAuth"): {
                     scheme: Bearer,
                     bearer_format: "JWT",
+                    description: "Test description"
                 },
                 (http "basicAuth"): {
-                    scheme: Basic
+                    scheme: Basic,
+                    description: "Another test description"
                 },
                 (apiKey "ApiKeyAuth"): {
                     parameter_in: Query,
-                    name: "X-API-KEY"
+                    name: "X-API-KEY",
+                    description: "And another test description"
                 }
             },
             paths: {
@@ -229,13 +233,16 @@ components:
       type: apiKey
       in: query
       name: X-API-KEY
+      description: And another test description
     basicAuth:
       type: http
       scheme: basic
+      description: Another test description
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+      description: Test description
     test_auth:
       type: apiKey
       in: query

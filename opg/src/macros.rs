@@ -377,13 +377,17 @@ macro_rules! describe_api {
         {
             let scheme = $crate::models::ParameterNotSpecified;
             let mut bearer_format: Option<String> = None;
+            let mut description: Option<String> = None;
 
-            describe_api!(@opg_security_scheme_http scheme bearer_format $($properties)*,);
+            describe_api!(@opg_security_scheme_http scheme bearer_format description $($properties)*,);
 
             let http_security_scheme = match scheme {
-                $crate::HttpSecuritySchemeKind::Basic => $crate::models::HttpSecurityScheme::Basic,
+                $crate::HttpSecuritySchemeKind::Basic => $crate::models::HttpSecurityScheme::Basic {
+                    description,
+                },
                 $crate::HttpSecuritySchemeKind::Bearer => $crate::models::HttpSecurityScheme::Bearer {
                     format: bearer_format,
+                    description,
                 },
             };
 
@@ -395,12 +399,14 @@ macro_rules! describe_api {
         {
             let mut parameter_in = $crate::models::ParameterIn::Header;
             let name = $crate::models::ParameterNotSpecified;
+            let mut description: Option<String> = None;
 
-            describe_api!(@opg_security_scheme_api_key parameter_in name $($properties)*,);
+            describe_api!(@opg_security_scheme_api_key parameter_in name description $($properties)*,);
 
             let scheme = $crate::models::ApiKeySecurityScheme {
                 parameter_in,
                 name,
+                description,
             };
 
             $result.components.security_schemes.insert($name.to_owned(), $crate::models::SecurityScheme::ApiKey(scheme));
@@ -410,26 +416,34 @@ macro_rules! describe_api {
     (@opg_security_scheme $result:ident $(,)?) => {};
 
 
-    (@opg_security_scheme_http $scheme:ident $bearer_format:ident scheme: $scheme_kind:ident, $($other:tt)*) => {
-        let $scheme = $crate::models::HttpSecuritySchemeKind::$scheme_kind;
-        describe_api!(@opg_security_scheme_http $scheme $bearer_format $($other)*)
+    (@opg_security_scheme_http $scheme:ident $bearer_format:ident $description:ident scheme: $value:ident, $($other:tt)*) => {
+        let $scheme = $crate::models::HttpSecuritySchemeKind::$value;
+        describe_api!(@opg_security_scheme_http $scheme $bearer_format $description $($other)*)
     };
-    (@opg_security_scheme_http $scheme:ident $bearer_format:ident bearer_format: $format:literal, $($other:tt)*) => {
-        let $bearer_format = Some($format.to_owned());
-        describe_api!(@opg_security_scheme_http $scheme $bearer_format $($other)*)
+    (@opg_security_scheme_http $scheme:ident $bearer_format:ident $description:ident bearer_format: $value:literal, $($other:tt)*) => {
+        $bearer_format = Some($value.to_owned());
+        describe_api!(@opg_security_scheme_http $scheme $bearer_format $description $($other)*)
     };
-    (@opg_security_scheme_http $scheme:ident $bearer_format:ident $(,)?) => {};
+    (@opg_security_scheme_http $scheme:ident $bearer_format:ident $description:ident description: $value:literal, $($other:tt)*) => {
+        $description = Some($value.to_owned());
+        describe_api!(@opg_security_scheme_http $scheme $bearer_format $description $($other)*)
+    };
+    (@opg_security_scheme_http $scheme:ident $bearer_format:ident $description:ident $(,)?) => {};
 
 
-    (@opg_security_scheme_api_key $parameter_in:ident $name:ident parameter_in: $value:ident, $($other:tt)*) => {
+    (@opg_security_scheme_api_key $parameter_in:ident $name:ident $description:ident parameter_in: $value:ident, $($other:tt)*) => {
         $parameter_in = $crate::models::ParameterIn::$value;
-        describe_api!(@opg_security_scheme_api_key $parameter_in $name $($other)*)
+        describe_api!(@opg_security_scheme_api_key $parameter_in $name $description $($other)*)
     };
-    (@opg_security_scheme_api_key $parameter_in:ident $name:ident name: $value:literal, $($other:tt)*) => {
+    (@opg_security_scheme_api_key $parameter_in:ident $name:ident $description:ident name: $value:literal, $($other:tt)*) => {
         let $name = $value.to_owned();
-        describe_api!(@opg_security_scheme_api_key $parameter_in $name $($other)*)
+        describe_api!(@opg_security_scheme_api_key $parameter_in $name $description $($other)*)
     };
-    (@opg_security_scheme_api_key $parameter_in:ident $name:ident $(,)?) => {};
+    (@opg_security_scheme_api_key $parameter_in:ident $name:ident $description:ident description: $value:literal, $($other:tt)*) => {
+        $description = Some($value.to_owned());
+        describe_api!(@opg_security_scheme_api_key $parameter_in $name $description $($other)*)
+    };
+    (@opg_security_scheme_api_key $parameter_in:ident $name:ident $description:ident $(,)?) => {};
 
 
     (@opg_property $result:ident paths $(($first_path_segment:tt$( / $path_segment:tt)*): {

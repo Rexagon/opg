@@ -952,10 +952,18 @@ pub enum SecurityScheme {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase", tag = "scheme")]
 pub enum HttpSecurityScheme {
-    Basic,
+    Basic {
+        /// A short description for security scheme
+        #[serde(skip_serializing_if = "Option::is_none")]
+        description: Option<String>,
+    },
     Bearer {
         #[serde(rename = "bearerFormat", skip_serializing_if = "Option::is_none")]
         format: Option<String>,
+
+        /// A short description for security scheme
+        #[serde(skip_serializing_if = "Option::is_none")]
+        description: Option<String>,
     },
 }
 
@@ -974,9 +982,16 @@ pub enum HttpSecuritySchemeKind {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ApiKeySecurityScheme {
+    /// The location of the API key
     #[serde(rename = "in")]
     pub parameter_in: ParameterIn,
+
+    /// The name of the header, query or cookie parameter to be used
     pub name: String,
+
+    /// A short description for security scheme
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
 }
 
 impl From<ApiKeySecurityScheme> for SecurityScheme {
