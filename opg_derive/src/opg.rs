@@ -516,11 +516,14 @@ fn serialize_newtype_struct(container: &Container, field: &Field) -> proc_macro2
     let context_params = ContextParams::from(&field.attrs).or(&container.attrs);
 
     let body = match container.attrs.explicit_model_type {
-        Some(explicit_model_type) => newtype_model(
-            container.attrs.nullable,
-            context_params,
-            explicit_model_type,
-        ),
+        Some(explicit_model_type) if explicit_model_type != ExplicitModelType::Any => {
+            newtype_model(
+                container.attrs.nullable,
+                context_params,
+                explicit_model_type,
+            )
+        }
+        Some(_) => unreachable!(),
         None => {
             let context_params = context_params.tokenize();
 
@@ -673,11 +676,16 @@ fn field_model_reference<'a>(
     let type_name = &field.original.ty;
 
     match field.attrs.explicit_model_type {
-        Some(explicit_model_type) => {
+        Some(explicit_model_type) if explicit_model_type != ExplicitModelType::Any => {
             let model = newtype_model(field.attrs.nullable, context_params, explicit_model_type);
 
             quote! {
                 _opg::ModelReference::Inline(#model)
+            }
+        }
+        Some(_) => {
+            quote! {
+                _opg::ModelReference::Any
             }
         }
         _ => {
@@ -722,7 +730,7 @@ fn newtype_model(
         ExplicitModelType::Boolean => quote! {
             _opg::ModelTypeDescription::Boolean
         },
-        ExplicitModelType::Any => todo!(),
+        ExplicitModelType::Any => unreachable!(),
     };
 
     quote! {

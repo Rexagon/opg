@@ -446,6 +446,26 @@ required:
         );
     }
 
+    #[derive(Debug, Serialize, OpgModel)]
+    struct StructWithAny {
+        #[opg(any)]
+        field: serde_yaml::Value,
+    }
+
+    #[test]
+    fn struct_with_any_field() {
+        let mut cx = Components::default();
+        assert_eq!(
+            serde_yaml::to_string(&StructWithAny::get_schema(&mut cx)).unwrap(),
+            r##"---
+type: object
+properties:
+  field: {}
+required:
+  - field"##
+        );
+    }
+
     #[test]
     fn complex_enum() {
         let mut cx = &mut Components::default();

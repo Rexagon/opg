@@ -408,7 +408,7 @@ impl Field {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub enum ExplicitModelType {
     String,
     Integer,

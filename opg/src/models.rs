@@ -2,7 +2,7 @@ use std::collections::{btree_map::Entry, BTreeMap};
 use std::fmt::Write;
 
 use either::*;
-use serde::ser::{SerializeMap, SerializeSeq};
+use serde::ser::{SerializeMap, SerializeSeq, SerializeStruct};
 use serde::{Serialize, Serializer};
 
 /// OpenAPI Object
@@ -640,7 +640,7 @@ impl ModelData {
 }
 
 /// oneOf
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelOneOf {
     pub one_of: Vec<ModelReference>,
@@ -733,7 +733,7 @@ impl ModelTypeDescription {
 }
 
 /// String data type
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelString {
     /// Possible values
@@ -764,7 +764,7 @@ impl From<ModelString> for ModelTypeDescription {
 }
 
 /// Simple model type description
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelSimple {
     /// Value format
@@ -898,6 +898,10 @@ pub enum ModelReference {
 
     /// Inlined model
     Inline(Model),
+
+    /// Any type, `{}`
+    #[serde(serialize_with = "serialize_model_reference_any")]
+    Any,
 }
 
 /// Serialize link as struct with `$ref` field
@@ -914,12 +918,20 @@ where
     ser.end()
 }
 
+/// Serialize any field as `{}`
+fn serialize_model_reference_any<S>(serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_struct("Any", 0)?.end()
+}
+
 impl ModelReference {
     /// Check links
     fn traverse<'a>(&'a self, mut cx: TraverseContext<'a>) -> Result<(), &'a str> {
         match &self {
             ModelReference::Link(ref link) => cx.check(link),
-            ModelReference::Inline(_) => Ok(()),
+            _ => Ok(()),
         }
     }
 }
