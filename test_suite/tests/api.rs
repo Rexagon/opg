@@ -99,6 +99,12 @@ mod tests {
                             required: true
                         },
                         200: SimpleEnum,
+                    },
+                    DELETE: {
+                        200: None,
+                    },
+                    OPTIONS: {
+                        200: ()
                     }
                 }
             }
@@ -178,6 +184,21 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SimpleEnum"
+    delete:
+      responses:
+        200:
+          description: OK
+    options:
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                description: "Always `null`"
+                nullable: true
+                type: string
+                format: "null"
     parameters:
       - name: asd
         in: header

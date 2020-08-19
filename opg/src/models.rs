@@ -323,7 +323,7 @@ pub struct Response {
     pub description: String,
 
     /// Response schema
-    pub schema: ModelReference,
+    pub schema: Option<ModelReference>,
 }
 
 impl Serialize for Response {
@@ -334,16 +334,15 @@ impl Serialize for Response {
         #[derive(Serialize)]
         struct ResponseHelper<'a> {
             description: &'a str,
-            content: ResponseContent<'a>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            content: Option<ResponseContent<'a>>,
         }
 
         ResponseHelper {
             description: &self.description,
-            content: ResponseContent {
-                media_type: ResponseMediaType {
-                    schema: &self.schema,
-                },
-            },
+            content: self.schema.as_ref().map(|schema| ResponseContent {
+                media_type: ResponseMediaType { schema },
+            }),
         }
         .serialize(serializer)
     }

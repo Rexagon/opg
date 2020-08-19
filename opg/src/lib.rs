@@ -85,6 +85,34 @@ array_impls! {
 impl_opg_model!(generic_dictionary: std::collections::HashMap<K, T>);
 impl_opg_model!(generic_dictionary: std::collections::BTreeMap<K, T>);
 
+impl OpgModel for () {
+    fn get_schema(_: &mut Components) -> Model {
+        Model {
+            description: Some("Always `null`".to_owned()),
+            data: ModelData::Single(ModelType {
+                nullable: true,
+                type_description: ModelTypeDescription::String(ModelString {
+                    variants: None,
+                    data: ModelSimple {
+                        format: Some("null".to_owned()),
+                        example: None,
+                    },
+                }),
+            }),
+        }
+    }
+
+    #[inline]
+    fn type_name() -> Option<&'static str> {
+        None
+    }
+
+    #[inline]
+    fn select_reference(cx: &mut Components, _: bool, params: &ContextParams) -> ModelReference {
+        ModelReference::Inline(Self::get_schema(cx).apply_params(params))
+    }
+}
+
 #[cfg(feature = "uuid")]
 impl OpgModel for uuid::Uuid {
     fn get_schema(_: &mut Components) -> Model {

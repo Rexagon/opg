@@ -515,7 +515,22 @@ macro_rules! describe_api {
         });
         describe_api!(@opg_path_value_operation_properties $result $context $($other)*)
     };
+    (@opg_path_value_operation_properties $result:ident $context:ident $response:literal$(($description:literal))?: None, $($other:tt)*) => {
+        describe_api!(@opg_path_value_operation_properties $result $context
+            $response$(($description))?: { None },
+            $($other)*)
+    };
+    (@opg_path_value_operation_properties $result:ident $context:ident $response:literal$(($description:literal))?: (), $($other:tt)*) => {
+        describe_api!(@opg_path_value_operation_properties $result $context
+            $response$(($description))?: { Some($result.components.mention_schema::<()>(false, &Default::default())) },
+            $($other)*)
+    };
     (@opg_path_value_operation_properties $result:ident $context:ident $response:literal$(($description:literal))?: $type:path, $($other:tt)*) => {
+        describe_api!(@opg_path_value_operation_properties $result $context
+            $response$(($description))?: { Some($result.components.mention_schema::<$type>(false, &Default::default())) },
+            $($other)*)
+    };
+    (@opg_path_value_operation_properties $result:ident $context:ident $response:literal$(($description:literal))?: {$($schema:tt)+}, $($other:tt)*) => {
         $context.responses.insert($response, $crate::models::Response {
             description: $crate::macros::FromStrangeTuple::extract(($($description.to_owned(),)?)).unwrap_or_else(||
                 $crate::macros::http::StatusCode::from_u16($response)
@@ -524,7 +539,7 @@ macro_rules! describe_api {
                     .map(ToString::to_string)
                     .unwrap_or_else(String::new)
             ),
-            schema: $result.components.mention_schema::<$type>(false, &Default::default())
+            schema: $($schema)+
         });
         describe_api!(@opg_path_value_operation_properties $result $context $($other)*)
     };

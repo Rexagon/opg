@@ -467,6 +467,19 @@ required:
     }
 
     #[test]
+    fn null_response() {
+        let mut cx = Components::default();
+        assert_eq!(
+            serde_yaml::to_string(&<()>::get_schema(&mut cx)).unwrap(),
+            r##"---
+description: "Always `null`"
+nullable: true
+type: string
+format: "null""##
+        );
+    }
+
+    #[test]
     fn complex_enum() {
         let mut cx = &mut Components::default();
         assert_eq!(
