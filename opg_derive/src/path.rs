@@ -29,7 +29,7 @@ fn parse_path(cx: &ParsingContext, attr: TokenStream) -> Option<()> {
 
     println!("http method: {:?}", http_method);
     println!("path: {:?}", path);
-    println!("content: {:?}", content);
+    println!("content: {:#?}", content);
 
     Some(())
 }
@@ -69,6 +69,9 @@ where
             }
             PathContentKeyRef::Ident("security") => {
                 result.security = parse_group_list(&mut content_iter)?;
+            }
+            PathContentKeyRef::Ident("parameters") => {
+                result.parameters = parse_path_parameters(&mut content_iter)?;
             }
             PathContentKeyRef::Ident("body") => {
                 result.body = Some(parse_type_until(&mut content_iter, ',')?);
@@ -195,6 +198,59 @@ where
             parse_delimiter(&mut param_iter, ':')?;
             let param_type = syn::parse::<syn::TypePath>(param_iter.collect()).ok()?;
             Some((param_name, param_type))
+        }
+        _ => None,
+    })
+}
+
+fn parse_path_parameters<I>(input: &mut Peekable<I>) -> Option<HashMap<String, Parameter>>
+where
+    I: Iterator<Item = TokenTree>,
+{
+    input.next().and_then(|token| match token {
+        TokenTree::Group(group) if group.delimiter() == Delimiter::Brace => {
+            let mut group_iter = group.stream().into_iter().peekable();
+
+            let mut result = HashMap::new();
+
+            loop {
+                let (name, parameter) = parse_path_parameter_item(&mut group_iter)?;
+                println!("parsed parameter: {:?}, {:?}", name, parameter);
+
+                result.insert(name, parameter);
+
+                if parse_trailing_delimiter(&mut group_iter, ',')? {
+                    break Some(result);
+                }
+            }
+        }
+        _ => None,
+    })
+}
+
+fn parse_path_parameter_item<I>(input: &mut I) -> Option<(String, Parameter)>
+where
+    I: Iterator<Item = TokenTree>,
+{
+    input.next().and_then(|token| match token {
+        TokenTree::Group(group) if group.delimiter() == Delimiter::Parenthesis => {
+            let mut group_iter = group.stream().into_iter().peekable();
+
+            let parameter_in = parse_ident(&mut group_iter)
+                .and_then(|ident| ParameterIn::from_str(&ident).ok())?;
+            let name = parse_ident(&mut group_iter)?;
+            parse_delimiter(&mut group_iter, ':')?;
+            let ty = syn::parse::<syn::TypePath>(group_iter.collect()).ok()?;
+
+            Some((
+                name,
+                Parameter {
+                    description: None,
+                    parameter_in,
+                    required: parameter_in.required_by_default(),
+                    ty,
+                },
+            ))
         }
         _ => None,
     })
@@ -343,17 +399,33 @@ struct PathContent {
     summary: Option<String>,
     description: Option<String>,
     security: Vec<String>,
+    parameters: HashMap<String, Parameter>,
     body: Option<syn::TypePath>,
     responses: HashMap<u16, syn::TypePath>,
 }
 
 impl std::fmt::Debug for PathContent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        struct ResponsesHelper<'a>(&'a HashMap<u16, syn::TypePath>);
+
+        impl<'a> std::fmt::Debug for ResponsesHelper<'a> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                let mut fmt = f.debug_map();
+                for (key, value) in self.0.iter() {
+                    fmt.key(key).value(&value.to_token_stream().to_string());
+                }
+                fmt.finish()
+            }
+        }
+
         f.debug_struct("PathContent")
             .field("tags", &self.tags)
             .field("summary", &self.summary)
             .field("description", &self.description)
             .field("security", &self.security)
+            .field("parameters", &self.parameters)
+            .field("body", &self.body.to_token_stream().to_string())
+            .field("responses", &ResponsesHelper(&self.responses))
             .finish()
     }
 }
@@ -362,6 +434,67 @@ impl std::fmt::Debug for PathContent {
 enum PathSegment {
     Path(String),
     Parameter(String),
+}
+
+#[derive(Clone)]
+struct Parameter {
+    description: Option<String>,
+    parameter_in: ParameterIn,
+    required: bool,
+    ty: syn::TypePath,
+}
+
+impl std::fmt::Debug for Parameter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Parameter")
+            .field("description", &self.description)
+            .field("parameter_in", &self.parameter_in)
+            .field("required", &self.required)
+            .field("ty", &self.ty.to_token_stream().to_string())
+            .finish()
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+enum ParameterIn {
+    Query,
+    Header,
+    Path,
+    Cookie,
+}
+
+impl ParameterIn {
+    fn required_by_default(&self) -> bool {
+        match self {
+            Self::Query | Self::Header | Self::Cookie => false,
+            Self::Path => true,
+        }
+    }
+}
+
+impl std::fmt::Display for ParameterIn {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Query => "query",
+            Self::Header => "header",
+            Self::Path => "path",
+            Self::Cookie => "cookie",
+        })
+    }
+}
+
+impl FromStr for ParameterIn {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "query" => Self::Query,
+            "header" => Self::Header,
+            "path" => Self::Path,
+            "cookie" => Self::Cookie,
+            _ => return Err(()),
+        })
+    }
 }
 
 #[derive(Debug, Copy, Clone)]

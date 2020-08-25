@@ -14,6 +14,10 @@ mod tests {
         summary: "Create deposit",
         description: "Some description",
         security: "Bearer",
+        parameters: {
+            (query interestCurrency: Currency),
+            (query interestPeriod: InterestPeriod)
+        },
         body: Vec<String>,
         200: String
     })]
