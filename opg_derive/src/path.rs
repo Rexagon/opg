@@ -3,38 +3,36 @@ use std::iter::Peekable;
 use std::str::FromStr;
 
 use proc_macro::{Delimiter, TokenStream, TokenTree};
-use proc_macro2::Span;
-use quote::{quote, ToTokens};
-
-use crate::case;
-use crate::parsing_context::*;
+use quote::ToTokens;
 
 pub fn impl_path(
     attr: TokenStream,
     item: TokenStream,
 ) -> Result<proc_macro2::TokenStream, Vec<syn::Error>> {
-    let cx = ParsingContext::new();
-    let http_method = parse_path(&cx, attr);
+    let _parsed = parse_path(attr);
 
-    cx.check().map(|_| item.into())
+    Ok(item.into())
 }
 
-fn parse_path(cx: &ParsingContext, attr: TokenStream) -> Option<()> {
+fn parse_path(attr: TokenStream) -> Option<(HttpMethod, Vec<PathSegment>, PathContent)> {
     let mut iter = attr.into_iter().peekable();
 
     let http_method = parse_ident(&mut iter).and_then(|ident| HttpMethod::from_str(&ident).ok())?;
-    let path = parse_path_address(&mut iter)?;
+
+    let mut content = PathContent::default();
+
+    let path = parse_path_address(&mut iter, &mut content.parameters)?;
     parse_delimiter(&mut iter, ':')?;
-    let content = parse_path_content(cx, &mut iter)?;
+    parse_path_content(&mut iter, &mut content)?;
 
     println!("http method: {:?}", http_method);
     println!("path: {:?}", path);
     println!("content: {:#?}", content);
 
-    Some(())
+    Some((http_method, path, content))
 }
 
-fn parse_path_content<I>(cx: &ParsingContext, input: &mut I) -> Option<PathContent>
+fn parse_path_content<I>(input: &mut I, content: &mut PathContent) -> Option<()>
 where
     I: Iterator<Item = TokenTree>,
 {
@@ -49,8 +47,6 @@ where
         .into_iter()
         .peekable();
 
-    let mut result = PathContent::default();
-
     loop {
         let key = parse_key(&mut content_iter)?;
         println!("parsed key: {:?}", key);
@@ -59,31 +55,26 @@ where
 
         match key.as_ref() {
             PathContentKeyRef::Ident("tags") => {
-                result.tags = parse_group_list(&mut content_iter)?;
+                content.tags = parse_group_list(&mut content_iter)?;
             }
             PathContentKeyRef::Ident("summary") => {
-                result.summary = Some(parse_string(&mut content_iter)?);
+                content.summary = Some(parse_string(&mut content_iter)?);
             }
             PathContentKeyRef::Ident("description") => {
-                result.description = Some(parse_string(&mut content_iter)?);
+                content.description = Some(parse_string(&mut content_iter)?);
             }
             PathContentKeyRef::Ident("security") => {
-                result.security = parse_group_list(&mut content_iter)?;
+                content.security = parse_group_list(&mut content_iter)?;
             }
             PathContentKeyRef::Ident("parameters") => {
-                result.parameters = parse_path_parameters(&mut content_iter)?;
+                content.parameters = parse_path_parameters(&mut content_iter)?;
             }
             PathContentKeyRef::Ident("body") => {
-                result.body = Some(parse_type_until(&mut content_iter, ',')?);
+                content.body = Some(parse_type_until(&mut content_iter, ',')?);
             }
-            PathContentKeyRef::Code(code, description) => {
-                println!("description: {:?}", description);
+            PathContentKeyRef::Code(code, _description) => {
                 let response_model = parse_type_until(&mut content_iter, ',')?;
-                println!(
-                    "response mode: {:?}",
-                    response_model.to_token_stream().to_string()
-                );
-                result.responses.insert(code, response_model);
+                content.responses.insert(code, response_model);
             }
             _ => return None,
         }
@@ -93,7 +84,7 @@ where
         }
     }
 
-    Some(result)
+    Some(())
 }
 
 fn parse_key<I>(input: &mut Peekable<I>) -> Option<PathContentKey>
@@ -120,7 +111,10 @@ where
     }
 }
 
-fn parse_path_address<I>(input: &mut Peekable<I>) -> Option<Vec<PathSegment>>
+fn parse_path_address<I>(
+    input: &mut Peekable<I>,
+    parameters: &mut HashMap<String, Parameter>,
+) -> Option<Vec<PathSegment>>
 where
     I: Iterator<Item = TokenTree>,
     Peekable<I>: Clone,
@@ -134,11 +128,6 @@ where
         .stream()
         .into_iter()
         .peekable();
-
-    println!(
-        "token stream: {:?}",
-        address_iter.clone().collect::<TokenStream>()
-    );
 
     if let Some(TokenTree::Punct(punct)) = address_iter.peek() {
         if punct.as_char() == '/' {
@@ -164,11 +153,16 @@ where
             Some(token @ TokenTree::Group(_)) => {
                 println!("group: {:?}", token);
 
-                let (param_name, param_type) = parse_path_address_named_segment(&mut address_iter)?;
-                println!(
-                    "param_name: {:?}, param_type: {:?}",
-                    param_name,
-                    param_type.to_token_stream().to_string()
+                let (param_name, ty) = parse_path_address_named_segment(&mut address_iter)?;
+
+                parameters.insert(
+                    param_name.clone(),
+                    Parameter {
+                        description: None,
+                        parameter_in: ParameterIn::Path,
+                        required: true,
+                        ty,
+                    },
                 );
 
                 result.push(PathSegment::Parameter(param_name));
@@ -261,9 +255,9 @@ where
     I: Iterator<Item = TokenTree>,
     Peekable<I>: Clone,
 {
-    let mut input_iter = input.clone();
     let result = syn::parse::<syn::TypePath>(
-        input_iter
+        input
+            .clone()
             .take_while(|_| match input.peek() {
                 Some(TokenTree::Punct(punct)) if punct.as_char() == delimiter => false,
                 item => {
