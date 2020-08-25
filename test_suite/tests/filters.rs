@@ -1,6 +1,6 @@
 #[allow(dead_code)]
 mod tests {
-    #[opg::path(GET: {
+    #[opg::path(GET ("some" / {test: i32} / "sdf"): {
         tags: { credits },
         summary: "Get planned payments schedule",
         description: "Test",

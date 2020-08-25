@@ -6,6 +6,7 @@ use proc_macro::{Delimiter, TokenStream, TokenTree};
 use proc_macro2::Span;
 use quote::{quote, ToTokens};
 
+use crate::case;
 use crate::parsing_context::*;
 
 pub fn impl_path(
@@ -19,13 +20,15 @@ pub fn impl_path(
 }
 
 fn parse_path(cx: &ParsingContext, attr: TokenStream) -> Option<()> {
-    let mut iter = attr.into_iter();
+    let mut iter = attr.into_iter().peekable();
 
     let http_method = parse_ident(&mut iter).and_then(|ident| HttpMethod::from_str(&ident).ok())?;
+    let path = parse_path_address(&mut iter)?;
     parse_delimiter(&mut iter, ':')?;
     let content = parse_path_content(cx, &mut iter)?;
 
     println!("http method: {:?}", http_method);
+    println!("path: {:?}", path);
     println!("content: {:?}", content);
 
     Some(())
@@ -107,26 +110,81 @@ where
     }
 }
 
-#[derive(Debug)]
-enum PathContentKey {
-    Ident(String),
-    Code(u16, Option<String>),
-}
+fn parse_path_address<I>(input: &mut Peekable<I>) -> Option<Vec<PathSegment>>
+where
+    I: Iterator<Item = TokenTree>,
+    Peekable<I>: Clone,
+{
+    let mut address_iter = input
+        .next()
+        .and_then(|token| match token {
+            TokenTree::Group(group) => Some(group),
+            _ => None,
+        })?
+        .stream()
+        .into_iter()
+        .peekable();
 
-impl PathContentKey {
-    fn as_ref(&self) -> PathContentKeyRef {
-        match self {
-            Self::Ident(ident) => PathContentKeyRef::Ident(ident),
-            Self::Code(code, description) => {
-                PathContentKeyRef::Code(*code, description.as_ref().map(String::as_str))
+    println!(
+        "token stream: {:?}",
+        address_iter.clone().collect::<TokenStream>()
+    );
+
+    let mut result = Vec::new();
+    loop {
+        match address_iter.peek() {
+            Some(token @ TokenTree::Literal(_)) => {
+                println!("literal: {:?}", token);
+                result.push(PathSegment::Path(parse_string(&mut address_iter)?));
             }
+            Some(token @ TokenTree::Ident(_)) => {
+                println!("ident: {:?}", token);
+                let ident = {
+                    let name = parse_ident(&mut address_iter)?;
+                    name[..1].to_ascii_lowercase() + &name[1..]
+                };
+                result.push(PathSegment::Parameter(ident));
+            }
+            Some(token @ TokenTree::Group(_)) => {
+                println!("group: {:?}", token);
+
+                let (param_name, param_type) = parse_path_address_named_segment(&mut address_iter)?;
+                println!(
+                    "param_name: {:?}, param_type: {:?}",
+                    param_name,
+                    param_type.to_token_stream().to_string()
+                );
+
+                result.push(PathSegment::Parameter(param_name));
+            }
+            token => {
+                println!("token: {:?}", token);
+                return None;
+            }
+        };
+
+        println!("iter: {:?}", result);
+
+        if parse_trailing_delimiter(&mut address_iter, '/')? {
+            break Some(result);
         }
     }
 }
 
-enum PathContentKeyRef<'a> {
-    Ident(&'a str),
-    Code(u16, Option<&'a str>),
+fn parse_path_address_named_segment<I>(input: &mut Peekable<I>) -> Option<(String, syn::TypePath)>
+where
+    I: Iterator<Item = TokenTree>,
+{
+    input.next().and_then(|token| match token {
+        TokenTree::Group(group) => {
+            let mut param_iter = group.stream().into_iter().peekable();
+            let param_name = parse_ident(&mut param_iter)?;
+            parse_delimiter(&mut param_iter, ':')?;
+            let param_type = syn::parse::<syn::TypePath>(param_iter.collect()).ok()?;
+            Some((param_name, param_type))
+        }
+        _ => None,
+    })
 }
 
 fn parse_type_until<I>(input: &mut Peekable<I>, delimiter: char) -> Option<syn::TypePath>
@@ -150,7 +208,6 @@ fn parse_group_list<I>(input: &mut I) -> Option<Vec<String>>
 where
     I: Iterator<Item = TokenTree>,
 {
-    println!("start list");
     input.next().and_then(|token| match token {
         TokenTree::Group(group)
             if matches!(group.delimiter(), Delimiter::Brace | Delimiter::Bracket) =>
@@ -158,11 +215,7 @@ where
             let mut group_iter = group.stream().into_iter().peekable();
             let mut result = Vec::new();
             loop {
-                println!("start");
-                let item = parse_string_or_ident(&mut group_iter)?;
-                println!("item: {:?}", item);
-
-                result.push(item);
+                result.push(parse_string_or_ident(&mut group_iter)?);
                 if parse_trailing_delimiter(&mut group_iter, ',')? {
                     break Some(result);
                 }
@@ -230,6 +283,7 @@ where
     I: Iterator<Item = TokenTree>,
 {
     if input.peek().is_some() {
+        println!("input peek: {:?}", input.peek());
         parse_delimiter(input, delimiter)?;
     }
     Some(input.peek().is_none())
@@ -239,23 +293,32 @@ fn parse_delimiter<I>(input: &mut I, delimiter: char) -> Option<()>
 where
     I: Iterator<Item = TokenTree>,
 {
-    let mut input_iter = input.peekable();
-    println!("next input: {:?}", input_iter.peek());
-
-    input_iter.next().and_then(|token| {
-        println!("token: {:?}", token);
-        match token {
-            TokenTree::Punct(punct) if punct.as_char() == delimiter => {
-                println!("delimiter");
-                Some(())
-            }
-            TokenTree::Punct(punct) => {
-                println!("punct: {:?}", punct);
-                None
-            }
-            _ => None,
-        }
+    input.next().and_then(|token| match token {
+        TokenTree::Punct(punct) if punct.as_char() == delimiter => Some(()),
+        _ => None,
     })
+}
+
+#[derive(Debug)]
+enum PathContentKey {
+    Ident(String),
+    Code(u16, Option<String>),
+}
+
+impl PathContentKey {
+    fn as_ref(&self) -> PathContentKeyRef {
+        match self {
+            Self::Ident(ident) => PathContentKeyRef::Ident(ident),
+            Self::Code(code, description) => {
+                PathContentKeyRef::Code(*code, description.as_ref().map(String::as_str))
+            }
+        }
+    }
+}
+
+enum PathContentKeyRef<'a> {
+    Ident(&'a str),
+    Code(u16, Option<&'a str>),
 }
 
 #[derive(Default)]
@@ -276,6 +339,12 @@ impl std::fmt::Debug for PathContent {
             .field("security", &self.security)
             .finish()
     }
+}
+
+#[derive(Debug, Clone)]
+enum PathSegment {
+    Path(String),
+    Parameter(String),
 }
 
 #[derive(Debug, Copy, Clone)]
