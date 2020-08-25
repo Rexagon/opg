@@ -1,3 +1,5 @@
+#![allow(clippy::zero_prefixed_literal)]
+
 #[allow(dead_code)]
 mod tests {
     use opg::*;

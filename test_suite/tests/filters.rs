@@ -5,7 +5,7 @@ mod tests {
         summary: "Get planned payments schedule",
         description: "Test",
         security: { "Bearer" },
-        200("OK"): Vec<responses::CreditPlannedScheduleResponseItem>,
+        200: Vec<responses::CreditPlannedScheduleResponseItem>,
     })]
     fn get_some_path() {}
 

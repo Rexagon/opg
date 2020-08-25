@@ -1,29 +1,39 @@
 use std::collections::HashMap;
 use std::iter::Peekable;
 use std::str::FromStr;
+use std::sync::Mutex;
 
-use proc_macro::{Delimiter, TokenStream, TokenTree};
-use quote::ToTokens;
+use lazy_static::lazy_static;
+use proc_macro2::{Delimiter, TokenStream, TokenTree};
 
-pub fn impl_path(
-    attr: TokenStream,
-    item: TokenStream,
-) -> Result<proc_macro2::TokenStream, Vec<syn::Error>> {
-    let _parsed = parse_path(attr);
+use crate::parsing_context::ParsingContext;
 
-    Ok(item.into())
+lazy_static! {
+    static ref PATH_DESCRIPTIONS: Mutex<HashMap<Vec<PathSegment>, HashMap<HttpMethod, PathContent>>> = Mutex::new(Default::default());
 }
 
-fn parse_path(attr: TokenStream) -> Option<(HttpMethod, Vec<PathSegment>, PathContent)> {
+pub fn impl_path(attr: proc_macro::TokenStream, item: proc_macro::TokenStream) -> Result<TokenStream, Vec<syn::Error>> {
+    let cx = ParsingContext::new();
+
+    let _parsed = parse_path(&cx, attr.into());
+
+    cx.check().map(|_| item.into())
+}
+
+fn parse_path(cx: &ParsingContext, attr: TokenStream) -> Option<(HttpMethod, Vec<PathSegment>, PathContent)> {
     let mut iter = attr.into_iter().peekable();
 
-    let http_method = parse_ident(&mut iter).and_then(|ident| HttpMethod::from_str(&ident).ok())?;
+    let http_method = parse_ident(cx, &mut iter).and_then(|ident| {
+        HttpMethod::from_str(&ident)
+            .ok()
+            .or_else(report_error(cx, iter.clone().collect::<TokenStream>(), "invalid http method name"))
+    })?;
 
     let mut content = PathContent::default();
 
-    let path = parse_path_address(&mut iter, &mut content.parameters)?;
-    parse_delimiter(&mut iter, ':')?;
-    parse_path_content(&mut iter, &mut content)?;
+    let path = parse_path_address(cx, &mut iter, &mut content.parameters)?;
+    parse_delimiter(cx, &mut iter, ':')?;
+    parse_path_content(cx, &mut iter, &mut content)?;
 
     println!("http method: {:?}", http_method);
     println!("path: {:?}", path);
@@ -32,54 +42,50 @@ fn parse_path(attr: TokenStream) -> Option<(HttpMethod, Vec<PathSegment>, PathCo
     Some((http_method, path, content))
 }
 
-fn parse_path_content<I>(input: &mut I, content: &mut PathContent) -> Option<()>
+fn parse_path_content<I>(cx: &ParsingContext, input: &mut I, content: &mut PathContent) -> Option<()>
 where
     I: Iterator<Item = TokenTree>,
 {
     let mut content_iter = input
         .next()
         .and_then(|tt| match tt {
-            TokenTree::Group(group) if group.delimiter() == Delimiter::Brace => {
-                Some(group.stream())
-            }
-            _ => None,
+            TokenTree::Group(group) if group.delimiter() == Delimiter::Brace => Some(group.stream()),
+            tt => None.or_else(report_error(cx, tt, "expected `{...}` group")),
         })?
         .into_iter()
         .peekable();
 
     loop {
-        let key = parse_key(&mut content_iter)?;
-        println!("parsed key: {:?}", key);
-        println!("next: {:?}", content_iter.peek());
-        parse_delimiter(&mut content_iter, ':')?;
+        let key = parse_key(cx, &mut content_iter)?;
+        parse_delimiter(cx, &mut content_iter, ':')?;
 
         match key.as_ref() {
             PathContentKeyRef::Ident("tags") => {
-                content.tags = parse_group_list(&mut content_iter)?;
+                content.tags = parse_group_list(cx, &mut content_iter)?;
             }
             PathContentKeyRef::Ident("summary") => {
-                content.summary = Some(parse_string(&mut content_iter)?);
+                content.summary = Some(parse_string(cx, &mut content_iter)?);
             }
             PathContentKeyRef::Ident("description") => {
-                content.description = Some(parse_string(&mut content_iter)?);
+                content.description = Some(parse_string(cx, &mut content_iter)?);
             }
             PathContentKeyRef::Ident("security") => {
-                content.security = parse_group_list(&mut content_iter)?;
+                content.security = parse_group_list(cx, &mut content_iter)?;
             }
             PathContentKeyRef::Ident("parameters") => {
-                content.parameters = parse_path_parameters(&mut content_iter)?;
+                content.parameters.extend(parse_path_parameters(cx, &mut content_iter)?);
             }
             PathContentKeyRef::Ident("body") => {
-                content.body = Some(parse_type_until(&mut content_iter, ',')?);
+                content.body = Some(parse_type_until(cx, &mut content_iter, ',')?.to_string());
             }
             PathContentKeyRef::Code(code, _description) => {
-                let response_model = parse_type_until(&mut content_iter, ',')?;
-                content.responses.insert(code, response_model);
+                let response_model = parse_type_until(cx, &mut content_iter, ',')?;
+                content.responses.insert(code, response_model.to_string());
             }
-            _ => return None,
+            _ => return None.or_else(report_error(cx, content_iter.collect::<TokenStream>(), "invalid field"))?,
         }
 
-        if parse_trailing_delimiter(&mut content_iter, ',')? {
+        if parse_trailing_delimiter(cx, &mut content_iter, ',')? {
             break;
         }
     }
@@ -87,31 +93,31 @@ where
     Some(())
 }
 
-fn parse_key<I>(input: &mut Peekable<I>) -> Option<PathContentKey>
+fn parse_key<I>(cx: &ParsingContext, input: &mut Peekable<I>) -> Option<PathContentKey>
 where
     I: Iterator<Item = TokenTree>,
     Peekable<I>: Clone,
 {
-    match input.peek()? {
-        TokenTree::Ident(_) => parse_ident(input).map(PathContentKey::Ident),
+    let tt = input.clone().collect::<TokenStream>();
+    let start_item = input.peek().or_else(report_error(cx, tt, "expected fields"))?;
+
+    match start_item {
+        TokenTree::Ident(_) => parse_ident(cx, input).map(PathContentKey::Ident),
         TokenTree::Literal(_) => {
-            let code = parse_integer(input)?;
+            let code = parse_integer(cx, input)?;
             let mut description = None;
-            println!(
-                "trying description: {:?}",
-                input.clone().collect::<TokenStream>().to_string()
-            );
             if let Some(TokenTree::Group(group)) = input.peek() {
                 let mut desc_iter = group.stream().into_iter();
-                description = Some(parse_string_or_ident(&mut desc_iter)?);
+                description = Some(parse_string_or_ident(cx, &mut desc_iter)?);
             }
             Some(PathContentKey::Code(code, description))
         }
-        _ => None,
+        tt => None.or_else(report_error(cx, tt, "expected identifier or integer literal")),
     }
 }
 
 fn parse_path_address<I>(
+    cx: &ParsingContext,
     input: &mut Peekable<I>,
     parameters: &mut HashMap<String, Parameter>,
 ) -> Option<Vec<PathSegment>>
@@ -123,7 +129,7 @@ where
         .next()
         .and_then(|token| match token {
             TokenTree::Group(group) => Some(group),
-            _ => None,
+            tt => None.or_else(report_error(cx, tt, "expected `(...) group`")),
         })?
         .stream()
         .into_iter()
@@ -138,66 +144,61 @@ where
     let mut result = Vec::new();
     loop {
         match address_iter.peek() {
-            Some(token @ TokenTree::Literal(_)) => {
-                println!("literal: {:?}", token);
-                result.push(PathSegment::Path(parse_string(&mut address_iter)?));
-            }
-            Some(token @ TokenTree::Ident(_)) => {
-                println!("ident: {:?}", token);
-                let ident = {
-                    let name = parse_ident(&mut address_iter)?;
-                    name[..1].to_ascii_lowercase() + &name[1..]
-                };
-                result.push(PathSegment::Parameter(ident));
-            }
-            Some(token @ TokenTree::Group(_)) => {
-                println!("group: {:?}", token);
+            Some(tt @ TokenTree::Literal(_)) => {
+                let tt = tt.clone();
+                let segment = parse_string(cx, &mut address_iter).or_else(report_error(cx, tt, "failed to parse path segment"))?;
 
-                let (param_name, ty) = parse_path_address_named_segment(&mut address_iter)?;
+                result.push(PathSegment::Path(segment));
+            }
+            Some(tt @ TokenTree::Ident(_)) => {
+                let tt = tt.clone();
+                let ty = parse_ident(cx, &mut address_iter).or_else(report_error(cx, tt, "failed to parse parameter"))?;
+                let param_name = ty[..1].to_ascii_lowercase() + &ty[1..];
 
-                parameters.insert(
-                    param_name.clone(),
-                    Parameter {
-                        description: None,
-                        parameter_in: ParameterIn::Path,
-                        required: true,
-                        ty,
-                    },
-                );
+                parameters.insert(param_name.clone(), Parameter::from_path(ty));
 
                 result.push(PathSegment::Parameter(param_name));
             }
-            token => {
-                println!("token: {:?}", token);
-                return None;
+            Some(TokenTree::Group(_)) => {
+                let (param_name, ty) = parse_path_address_named_segment(cx, &mut address_iter)?;
+
+                parameters.insert(param_name.clone(), Parameter::from_path(ty.to_string()));
+
+                result.push(PathSegment::Parameter(param_name));
             }
+            tt => None.or_else(report_error(cx, tt, "expected literal or ident or `{...} group`"))?,
         };
 
-        println!("iter: {:?}", result);
-
-        if parse_trailing_delimiter(&mut address_iter, '/')? {
+        if parse_trailing_delimiter(cx, &mut address_iter, '/')? {
             break Some(result);
         }
     }
 }
 
-fn parse_path_address_named_segment<I>(input: &mut Peekable<I>) -> Option<(String, syn::TypePath)>
+fn parse_path_address_named_segment<I>(cx: &ParsingContext, input: &mut Peekable<I>) -> Option<(String, syn::TypePath)>
 where
     I: Iterator<Item = TokenTree>,
 {
     input.next().and_then(|token| match token {
         TokenTree::Group(group) => {
             let mut param_iter = group.stream().into_iter().peekable();
-            let param_name = parse_ident(&mut param_iter)?;
-            parse_delimiter(&mut param_iter, ':')?;
-            let param_type = syn::parse::<syn::TypePath>(param_iter.collect()).ok()?;
+
+            let param_name = parse_ident(cx, &mut param_iter).or_else(report_error(cx, group, "failed to parse parameter name"))?;
+
+            parse_delimiter(cx, &mut param_iter, ':')?;
+
+            let tt = param_iter.collect::<TokenStream>();
+            let param_type = syn::parse2::<syn::TypePath>(tt.clone())
+                .ok()
+                .or_else(report_error(cx, tt, "invalid type path"))?;
+
             Some((param_name, param_type))
         }
         _ => None,
     })
 }
 
-fn parse_path_parameters<I>(input: &mut Peekable<I>) -> Option<HashMap<String, Parameter>>
+fn parse_path_parameters<I>(cx: &ParsingContext, input: &mut Peekable<I>) -> Option<HashMap<String, Parameter>>
 where
     I: Iterator<Item = TokenTree>,
 {
@@ -208,21 +209,19 @@ where
             let mut result = HashMap::new();
 
             loop {
-                let (name, parameter) = parse_path_parameter_item(&mut group_iter)?;
-                println!("parsed parameter: {:?}, {:?}", name, parameter);
-
+                let (name, parameter) = parse_path_parameter_item(cx, &mut group_iter)?;
                 result.insert(name, parameter);
 
-                if parse_trailing_delimiter(&mut group_iter, ',')? {
+                if parse_trailing_delimiter(cx, &mut group_iter, ',')? {
                     break Some(result);
                 }
             }
         }
-        _ => None,
+        tt => None.or_else(report_error(cx, tt, "expected `{...}` group")),
     })
 }
 
-fn parse_path_parameter_item<I>(input: &mut I) -> Option<(String, Parameter)>
+fn parse_path_parameter_item<I>(cx: &ParsingContext, input: &mut I) -> Option<(String, Parameter)>
 where
     I: Iterator<Item = TokenTree>,
 {
@@ -230,11 +229,18 @@ where
         TokenTree::Group(group) if group.delimiter() == Delimiter::Parenthesis => {
             let mut group_iter = group.stream().into_iter().peekable();
 
-            let parameter_in = parse_ident(&mut group_iter)
-                .and_then(|ident| ParameterIn::from_str(&ident).ok())?;
-            let name = parse_ident(&mut group_iter)?;
-            parse_delimiter(&mut group_iter, ':')?;
-            let ty = syn::parse::<syn::TypePath>(group_iter.collect()).ok()?;
+            let parameter_in = parse_ident(cx, &mut group_iter)
+                .and_then(|ident| ParameterIn::from_str(&ident).ok())
+                .or_else(report_error(cx, group.clone(), "failed to parse `ParameterIn`"))?;
+
+            let name = parse_ident(cx, &mut group_iter).or_else(report_error(cx, group, "failed to parse parameter name"))?;
+
+            parse_delimiter(cx, &mut group_iter, ':')?;
+
+            let tt = group_iter.collect::<TokenStream>();
+            let ty = syn::parse2::<syn::TypePath>(tt.clone())
+                .ok()
+                .or_else(report_error(cx, tt, "invalid type path"))?;
 
             Some((
                 name,
@@ -242,97 +248,105 @@ where
                     description: None,
                     parameter_in,
                     required: parameter_in.required_by_default(),
-                    ty,
+                    ty: ty.to_string(),
                 },
             ))
         }
-        _ => None,
+        tt => None.or_else(report_error(cx, tt, "expected `(...)` group")),
     })
 }
 
-fn parse_type_until<I>(input: &mut Peekable<I>, delimiter: char) -> Option<syn::TypePath>
+fn parse_type_until<I>(cx: &ParsingContext, input: &mut Peekable<I>, delimiter: char) -> Option<syn::TypePath>
 where
     I: Iterator<Item = TokenTree>,
     Peekable<I>: Clone,
 {
-    let result = syn::parse::<syn::TypePath>(
-        input
-            .clone()
-            .take_while(|_| match input.peek() {
-                Some(TokenTree::Punct(punct)) if punct.as_char() == delimiter => false,
-                item => {
-                    println!("take while: {:?}", item);
-                    input.next().is_some()
-                }
-            })
-            .collect(),
-    );
-    result.ok()
+    let tt = input
+        .clone()
+        .take_while(|_| match input.peek() {
+            Some(TokenTree::Punct(punct)) if punct.as_char() == delimiter => false,
+            _ => input.next().is_some(),
+        })
+        .collect::<TokenStream>();
+
+    syn::parse2::<syn::TypePath>(tt.clone())
+        .ok()
+        .or_else(report_error(cx, tt, "invalid type path"))
 }
 
-fn parse_group_list<I>(input: &mut I) -> Option<Vec<String>>
+fn parse_group_list<I>(cx: &ParsingContext, input: &mut I) -> Option<Vec<String>>
 where
     I: Iterator<Item = TokenTree>,
 {
     input.next().and_then(|token| match token {
-        TokenTree::Group(group)
-            if matches!(group.delimiter(), Delimiter::Brace | Delimiter::Bracket) =>
-        {
+        TokenTree::Group(group) if matches!(group.delimiter(), Delimiter::Brace | Delimiter::Bracket) => {
             let mut group_iter = group.stream().into_iter().peekable();
             let mut result = Vec::new();
             loop {
-                result.push(parse_string_or_ident(&mut group_iter)?);
-                if parse_trailing_delimiter(&mut group_iter, ',')? {
+                result.push(parse_string_or_ident(cx, &mut group_iter)?);
+                if parse_trailing_delimiter(cx, &mut group_iter, ',')? {
                     break Some(result);
                 }
             }
         }
-        token @ TokenTree::Ident(_) => syn::parse::<syn::Ident>(token.into())
-            .map(|ident| vec![ident.to_string()])
-            .ok(),
-        token @ TokenTree::Literal(_) => syn::parse::<syn::LitStr>(token.into())
-            .map(|literal| vec![literal.value()])
-            .ok(),
-        _ => None,
+        tt @ TokenTree::Ident(_) => syn::parse2::<syn::Ident>(tt.clone().into())
+            .ok()
+            .or_else(report_error(cx, tt, "invalid identifier"))
+            .map(|ident| vec![ident.to_string()]),
+        tt @ TokenTree::Literal(_) => syn::parse2::<syn::LitStr>(tt.clone().into())
+            .ok()
+            .or_else(report_error(cx, tt, "invalid string literal"))
+            .map(|literal| vec![literal.value()]),
+        tt => None.or_else(report_error(cx, tt, "expected group or identifier or string literal")),
     })
 }
 
-fn parse_string_or_ident<I>(input: &mut I) -> Option<String>
+fn parse_string_or_ident<I>(cx: &ParsingContext, input: &mut I) -> Option<String>
 where
     I: Iterator<Item = TokenTree>,
 {
     input.next().and_then(|token| match token {
-        token @ TokenTree::Ident(_) => syn::parse::<syn::Ident>(token.into())
-            .map(|ident| ident.to_string())
-            .ok(),
-        token @ TokenTree::Literal(_) => syn::parse::<syn::LitStr>(token.into())
-            .map(|literal| literal.value())
-            .ok(),
-        _ => None,
+        tt @ TokenTree::Ident(_) => syn::parse2::<syn::Ident>(tt.clone().into())
+            .ok()
+            .or_else(report_error(cx, tt, "invalid identifier"))
+            .map(|ident| ident.to_string()),
+        tt @ TokenTree::Literal(_) => syn::parse2::<syn::LitStr>(tt.clone().into())
+            .ok()
+            .or_else(report_error(cx, tt, "invalid string literal"))
+            .map(|literal| literal.value()),
+        tt => None.or_else(report_error(cx, tt, "expected identifier or string literal")),
     })
 }
 
-fn parse_string<I>(input: &mut I) -> Option<String>
+fn parse_string<I>(cx: &ParsingContext, input: &mut I) -> Option<String>
 where
     I: Iterator<Item = TokenTree>,
 {
     input
         .next()
-        .and_then(|token| syn::parse::<syn::LitStr>(token.into()).ok())
+        .and_then(|tt| {
+            syn::parse2::<syn::LitStr>(tt.clone().into())
+                .ok()
+                .or_else(report_error(cx, tt, "invalid string literal"))
+        })
         .map(|literal: syn::LitStr| literal.value())
 }
 
-fn parse_ident<I>(input: &mut I) -> Option<String>
+fn parse_ident<I>(cx: &ParsingContext, input: &mut I) -> Option<String>
 where
     I: Iterator<Item = TokenTree>,
 {
     input
         .next()
-        .and_then(|token| syn::parse::<syn::Ident>(token.into()).ok())
+        .and_then(|tt| {
+            syn::parse2::<syn::Ident>(tt.clone().into())
+                .ok()
+                .or_else(report_error(cx, tt, "invalid identifier"))
+        })
         .map(|ident| ident.to_string())
 }
 
-fn parse_integer<I, T>(input: &mut I) -> Option<T>
+fn parse_integer<I, T>(cx: &ParsingContext, input: &mut I) -> Option<T>
 where
     I: Iterator<Item = TokenTree>,
     T: FromStr,
@@ -340,28 +354,38 @@ where
 {
     input
         .next()
-        .and_then(|token| syn::parse::<syn::LitInt>(token.into()).ok())
-        .and_then(|literal| literal.base10_parse().ok())
+        .and_then(|tt| {
+            syn::parse2::<syn::LitInt>(tt.clone().into())
+                .ok()
+                .or_else(report_error(cx, tt, "invalid integer literal"))
+        })
+        .and_then(|literal| {
+            literal.base10_parse().ok().or_else(report_error(
+                cx,
+                literal,
+                format!("invalid integer literal value (`{}` expected)", std::any::type_name::<T>()),
+            ))
+        })
 }
 
-fn parse_trailing_delimiter<I>(input: &mut Peekable<I>, delimiter: char) -> Option<bool>
+fn parse_trailing_delimiter<I>(cx: &ParsingContext, input: &mut Peekable<I>, delimiter: char) -> Option<bool>
 where
     I: Iterator<Item = TokenTree>,
 {
     if input.peek().is_some() {
-        println!("input peek: {:?}", input.peek());
-        parse_delimiter(input, delimiter)?;
+        parse_delimiter(cx, input, delimiter)?;
     }
     Some(input.peek().is_none())
 }
 
-fn parse_delimiter<I>(input: &mut I, delimiter: char) -> Option<()>
+fn parse_delimiter<I>(cx: &ParsingContext, input: &mut I, delimiter: char) -> Option<()>
 where
     I: Iterator<Item = TokenTree>,
 {
     input.next().and_then(|token| match token {
         TokenTree::Punct(punct) if punct.as_char() == delimiter => Some(()),
-        _ => None,
+        TokenTree::Punct(punct) => None.or_else(report_error(cx, punct, format!("invalid punctuation (`{}` expected)", delimiter))),
+        tt => None.or_else(report_error(cx, tt, format!("`{}` expected", delimiter))),
     })
 }
 
@@ -375,9 +399,7 @@ impl PathContentKey {
     fn as_ref(&self) -> PathContentKeyRef {
         match self {
             Self::Ident(ident) => PathContentKeyRef::Ident(ident),
-            Self::Code(code, description) => {
-                PathContentKeyRef::Code(*code, description.as_ref().map(String::as_str))
-            }
+            Self::Code(code, description) => PathContentKeyRef::Code(*code, description.as_ref().map(String::as_str)),
         }
     }
 }
@@ -387,65 +409,39 @@ enum PathContentKeyRef<'a> {
     Code(u16, Option<&'a str>),
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct PathContent {
     tags: Vec<String>,
     summary: Option<String>,
     description: Option<String>,
     security: Vec<String>,
     parameters: HashMap<String, Parameter>,
-    body: Option<syn::TypePath>,
-    responses: HashMap<u16, syn::TypePath>,
+    body: Option<String>,
+    responses: HashMap<u16, String>,
 }
 
-impl std::fmt::Debug for PathContent {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        struct ResponsesHelper<'a>(&'a HashMap<u16, syn::TypePath>);
-
-        impl<'a> std::fmt::Debug for ResponsesHelper<'a> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let mut fmt = f.debug_map();
-                for (key, value) in self.0.iter() {
-                    fmt.key(key).value(&value.to_token_stream().to_string());
-                }
-                fmt.finish()
-            }
-        }
-
-        f.debug_struct("PathContent")
-            .field("tags", &self.tags)
-            .field("summary", &self.summary)
-            .field("description", &self.description)
-            .field("security", &self.security)
-            .field("parameters", &self.parameters)
-            .field("body", &self.body.to_token_stream().to_string())
-            .field("responses", &ResponsesHelper(&self.responses))
-            .finish()
-    }
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 enum PathSegment {
     Path(String),
     Parameter(String),
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 struct Parameter {
     description: Option<String>,
     parameter_in: ParameterIn,
     required: bool,
-    ty: syn::TypePath,
+    ty: String,
 }
 
-impl std::fmt::Debug for Parameter {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Parameter")
-            .field("description", &self.description)
-            .field("parameter_in", &self.parameter_in)
-            .field("required", &self.required)
-            .field("ty", &self.ty.to_token_stream().to_string())
-            .finish()
+impl Parameter {
+    fn from_path(ty: String) -> Self {
+        Self {
+            description: None,
+            parameter_in: ParameterIn::Path,
+            required: true,
+            ty,
+        }
     }
 }
 
@@ -491,7 +487,7 @@ impl FromStr for ParameterIn {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 enum HttpMethod {
     GET,
     PUT,
@@ -534,4 +530,32 @@ impl std::fmt::Display for HttpMethod {
             HttpMethod::TRACE => "TRACE",
         })
     }
+}
+
+trait TypePathExt {
+    fn to_string(&self) -> String;
+}
+
+impl TypePathExt for syn::TypePath {
+    fn to_string(&self) -> String {
+        stream_to_string(&self)
+    }
+}
+
+fn report_error<'c, O, T, R>(cx: &'c ParsingContext, tt: O, message: T) -> impl FnOnce() -> Option<R> + 'c
+where
+    O: quote::ToTokens + 'c,
+    T: std::fmt::Display + 'c,
+{
+    move || {
+        cx.error_spanned_by(tt, message);
+        None::<R>
+    }
+}
+
+fn stream_to_string<T>(ty: &T) -> String
+where
+    T: quote::ToTokens,
+{
+    ty.to_token_stream().to_string().replace(' ', "")
 }

@@ -91,24 +91,17 @@ impl<'a> Data<'a> {
     #[allow(dead_code)]
     pub fn all_fields(&'a self) -> impl Iterator<Item = &'a Field<'a>> {
         match self {
-            Data::Enum(variants) => {
-                Either::Left(variants.iter().flat_map(|variant| variant.fields.iter()))
-            }
+            Data::Enum(variants) => Either::Left(variants.iter().flat_map(|variant| variant.fields.iter())),
             Data::Struct(_, fields) => Either::Right(fields.iter()),
         }
     }
 }
 
-fn enum_from_ast<'a>(
-    cx: &ParsingContext,
-    variants: &'a Punctuated<syn::Variant, syn::Token![,]>,
-) -> Option<Vec<Variant<'a>>> {
+fn enum_from_ast<'a>(cx: &ParsingContext, variants: &'a Punctuated<syn::Variant, syn::Token![,]>) -> Option<Vec<Variant<'a>>> {
     let has_consistent_discriminants = {
         let mut iter = variants.iter();
         match iter.next() {
-            Some(variant) => {
-                iter.all(|item| item.discriminant.is_some() == variant.discriminant.is_some())
-            }
+            Some(variant) => iter.all(|item| item.discriminant.is_some() == variant.discriminant.is_some()),
             None => true,
         }
     };
@@ -136,24 +129,16 @@ fn enum_from_ast<'a>(
     )
 }
 
-fn struct_from_ast<'a>(
-    cx: &ParsingContext,
-    fields: &'a syn::Fields,
-) -> (StructStyle, Vec<Field<'a>>) {
+fn struct_from_ast<'a>(cx: &ParsingContext, fields: &'a syn::Fields) -> (StructStyle, Vec<Field<'a>>) {
     match fields {
         syn::Fields::Named(fields) => (StructStyle::Struct, fields_from_ast(cx, &fields.named)),
-        syn::Fields::Unnamed(fields) if fields.unnamed.len() == 1 => {
-            (StructStyle::NewType, fields_from_ast(cx, &fields.unnamed))
-        }
+        syn::Fields::Unnamed(fields) if fields.unnamed.len() == 1 => (StructStyle::NewType, fields_from_ast(cx, &fields.unnamed)),
         syn::Fields::Unnamed(fields) => (StructStyle::Tuple, fields_from_ast(cx, &fields.unnamed)),
         syn::Fields::Unit => (StructStyle::Unit, Vec::new()),
     }
 }
 
-fn fields_from_ast<'a>(
-    cx: &ParsingContext,
-    fields: &'a Punctuated<syn::Field, syn::Token![,]>,
-) -> Vec<Field<'a>> {
+fn fields_from_ast<'a>(cx: &ParsingContext, fields: &'a Punctuated<syn::Field, syn::Token![,]>) -> Vec<Field<'a>> {
     fields
         .iter()
         .enumerate()

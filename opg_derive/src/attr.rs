@@ -64,9 +64,7 @@ impl Container {
                     }
                 }
                 (AttrFrom::Serde, Meta(NameValue(m))) if m.path == RENAME_ALL => {
-                    if let Ok(rule) = get_lit_str(cx, RENAME_ALL, &m.lit)
-                        .and_then(|s| RenameRule::from_str(&s.value()))
-                    {
+                    if let Ok(rule) = get_lit_str(cx, RENAME_ALL, &m.lit).and_then(|s| RenameRule::from_str(&s.value())) {
                         rename_rule.set(&m.path, rule)
                     }
                 }
@@ -132,15 +130,8 @@ impl Container {
                     }
                 }
                 (AttrFrom::Opg, Meta(meta_item)) => {
-                    let path = meta_item
-                        .path()
-                        .into_token_stream()
-                        .to_string()
-                        .replace(' ', "");
-                    cx.error_spanned_by(
-                        meta_item.path(),
-                        format!("unknown opg variant attribute `{}`", path),
-                    );
+                    let path = meta_item.path().into_token_stream().to_string().replace(' ', "");
+                    cx.error_spanned_by(meta_item.path(), format!("unknown opg variant attribute `{}`", path));
                 }
                 (AttrFrom::Repr, item) => {
                     has_repr.set_true(item);
@@ -212,9 +203,7 @@ impl Variant {
                     }
                 }
                 (AttrFrom::Serde, Meta(NameValue(m))) if m.path == RENAME_ALL => {
-                    if let Ok(rule) = get_lit_str(cx, RENAME_ALL, &m.lit)
-                        .and_then(|s| RenameRule::from_str(&s.value()))
-                    {
+                    if let Ok(rule) = get_lit_str(cx, RENAME_ALL, &m.lit).and_then(|s| RenameRule::from_str(&s.value())) {
                         rename_rule.set(&m.path, rule)
                     }
                 }
@@ -253,15 +242,8 @@ impl Variant {
                     }
                 }
                 (AttrFrom::Opg, Meta(meta_item)) => {
-                    let path = meta_item
-                        .path()
-                        .into_token_stream()
-                        .to_string()
-                        .replace(' ', "");
-                    cx.error_spanned_by(
-                        meta_item.path(),
-                        format!("unknown opg variant attribute `{}`", path),
-                    );
+                    let path = meta_item.path().into_token_stream().to_string().replace(' ', "");
+                    cx.error_spanned_by(meta_item.path(), format!("unknown opg variant attribute `{}`", path));
                 }
                 (AttrFrom::Repr, _) => {}
             }
@@ -374,15 +356,8 @@ impl Field {
                     }
                 }
                 (AttrFrom::Opg, Meta(meta_item)) => {
-                    let path = meta_item
-                        .path()
-                        .into_token_stream()
-                        .to_string()
-                        .replace(' ', "");
-                    cx.error_spanned_by(
-                        meta_item.path(),
-                        format!("unknown opg variant attribute `{}`", path),
-                    );
+                    let path = meta_item.path().into_token_stream().to_string().replace(' ', "");
+                    cx.error_spanned_by(meta_item.path(), format!("unknown opg variant attribute `{}`", path));
                 }
                 (AttrFrom::Repr, _) => {}
             }
@@ -465,24 +440,13 @@ fn decide_tag(untagged: BoolAttr, internal_tag: Attr<String>, content: Attr<Stri
     }
 }
 
-fn decide_model_type(
-    cx: &ParsingContext,
-    input: &syn::DeriveInput,
-    tag_type: &TagType,
-) -> Result<ModelType, ()> {
+fn decide_model_type(cx: &ParsingContext, input: &syn::DeriveInput, tag_type: &TagType) -> Result<ModelType, ()> {
     Ok(match &input.data {
         syn::Data::Enum(variants) => {
-            if variants
-                .variants
-                .iter()
-                .all(|field| matches!(field.fields, syn::Fields::Unit))
-            {
+            if variants.variants.iter().all(|field| matches!(field.fields, syn::Fields::Unit)) {
                 return match tag_type {
                     TagType::None => {
-                        cx.error_spanned_by(
-                            &input.ident,
-                            "unit enums are not supported for untagged",
-                        );
+                        cx.error_spanned_by(&input.ident, "unit enums are not supported for untagged");
                         Err(())
                     }
                     _ => Ok(ModelType::NewType),
@@ -510,10 +474,7 @@ fn decide_model_type(
     })
 }
 
-fn get_renames<'a>(
-    cx: &ParsingContext,
-    items: &'a Punctuated<syn::NestedMeta, syn::Token![,]>,
-) -> Result<Option<&'a syn::LitStr>, ()> {
+fn get_renames<'a>(cx: &ParsingContext, items: &'a Punctuated<syn::NestedMeta, syn::Token![,]>) -> Result<Option<&'a syn::LitStr>, ()> {
     let ser = get_ser(cx, RENAME, items)?;
     Ok(ser.at_most_one()?)
 }
@@ -540,18 +501,9 @@ fn get_ser<'c, 'm>(
     Ok(ser_meta)
 }
 
-fn parse_lit_into_expr_path(
-    cx: &ParsingContext,
-    attr_name: Symbol,
-    lit: &syn::Lit,
-) -> Result<syn::ExprPath, ()> {
+fn parse_lit_into_expr_path(cx: &ParsingContext, attr_name: Symbol, lit: &syn::Lit) -> Result<syn::ExprPath, ()> {
     let string = get_lit_str(cx, attr_name, lit)?;
-    parse_lit_str(string).map_err(|_| {
-        cx.error_spanned_by(
-            lit,
-            format!("failed to parse path expr: {:?}", string.value()),
-        )
-    })
+    parse_lit_str(string).map_err(|_| cx.error_spanned_by(lit, format!("failed to parse path expr: {:?}", string.value())))
 }
 
 fn parse_lit_str<T>(s: &syn::LitStr) -> syn::parse::Result<T>
@@ -568,10 +520,7 @@ fn spanned_tokens(s: &syn::LitStr) -> syn::parse::Result<TokenStream> {
 }
 
 fn respan_token_stream(stream: TokenStream, span: Span) -> TokenStream {
-    stream
-        .into_iter()
-        .map(|token| respan_token_tree(token, span))
-        .collect()
+    stream.into_iter().map(|token| respan_token_tree(token, span)).collect()
 }
 
 fn respan_token_tree(mut token: TokenTree, span: Span) -> TokenTree {
@@ -590,38 +539,23 @@ fn get_lit_str_simple(lit: &syn::Lit) -> Result<&syn::LitStr, ()> {
     }
 }
 
-fn get_lit_str<'a>(
-    cx: &ParsingContext,
-    attr_name: Symbol,
-    lit: &'a syn::Lit,
-) -> Result<&'a syn::LitStr, ()> {
+fn get_lit_str<'a>(cx: &ParsingContext, attr_name: Symbol, lit: &'a syn::Lit) -> Result<&'a syn::LitStr, ()> {
     get_lit_str_special(cx, attr_name, attr_name, lit)
 }
 
-fn get_lit_str_special<'a>(
-    cx: &ParsingContext,
-    attr_name: Symbol,
-    path_name: Symbol,
-    lit: &'a syn::Lit,
-) -> Result<&'a syn::LitStr, ()> {
+fn get_lit_str_special<'a>(cx: &ParsingContext, attr_name: Symbol, path_name: Symbol, lit: &'a syn::Lit) -> Result<&'a syn::LitStr, ()> {
     if let syn::Lit::Str(lit) = lit {
         Ok(lit)
     } else {
         cx.error_spanned_by(
             lit,
-            format!(
-                "expected {} attribute to be a string: `{} = \"...\"`",
-                attr_name, path_name
-            ),
+            format!("expected {} attribute to be a string: `{} = \"...\"`", attr_name, path_name),
         );
         Err(())
     }
 }
 
-fn get_meta_items(
-    cx: &ParsingContext,
-    attr: &syn::Attribute,
-) -> Result<Vec<(AttrFrom, syn::NestedMeta)>, ()> {
+fn get_meta_items(cx: &ParsingContext, attr: &syn::Attribute) -> Result<Vec<(AttrFrom, syn::NestedMeta)>, ()> {
     let attr_from = if attr.path == OPG {
         AttrFrom::Opg
     } else if attr.path == SERDE {
@@ -633,11 +567,7 @@ fn get_meta_items(
     };
 
     match attr.parse_meta() {
-        Ok(List(meta)) => Ok(meta
-            .nested
-            .into_iter()
-            .map(|meta| (attr_from, meta))
-            .collect()),
+        Ok(List(meta)) => Ok(meta.nested.into_iter().map(|meta| (attr_from, meta)).collect()),
         Ok(other) => {
             cx.error_spanned_by(other, format!("expected #[{}(...)]", attr_from));
             Err(())
@@ -687,8 +617,7 @@ impl<'c, T> Attr<'c, T> {
         let tokens = object.into_token_stream();
 
         if self.value.is_some() {
-            self.cx
-                .error_spanned_by(tokens, format!("duplicate opg attribute `{}`", self.name));
+            self.cx.error_spanned_by(tokens, format!("duplicate opg attribute `{}`", self.name));
         } else {
             self.tokens = tokens;
             self.value = Some(value);
@@ -763,8 +692,7 @@ impl<'c, T> OneOfFlagsAttr<'c, T> {
     fn at_most_one(mut self) -> Option<T> {
         if self.values.len() > 1 {
             let dup_token = self.first_dup_tokens;
-            self.cx
-                .error_spanned_by(dup_token, "duplicate opg attribute");
+            self.cx.error_spanned_by(dup_token, "duplicate opg attribute");
         }
 
         self.values.pop()
@@ -803,10 +731,8 @@ impl<'c, T> VecAttr<'c, T> {
     fn at_most_one(mut self) -> Result<Option<T>, ()> {
         if self.values.len() > 1 {
             let dup_token = self.first_dup_tokens;
-            self.cx.error_spanned_by(
-                dup_token,
-                format!("duplicate opg attribute `{}`", self.name),
-            );
+            self.cx
+                .error_spanned_by(dup_token, format!("duplicate opg attribute `{}`", self.name));
             Err(())
         } else {
             Ok(self.values.pop())

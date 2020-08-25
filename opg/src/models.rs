@@ -17,10 +17,7 @@ pub struct Opg {
     pub info: Info,
 
     /// A list of tags used by the specification with additional metadata
-    #[serde(
-        skip_serializing_if = "BTreeMap::is_empty",
-        serialize_with = "serialize_tags"
-    )]
+    #[serde(skip_serializing_if = "BTreeMap::is_empty", serialize_with = "serialize_tags")]
     pub tags: BTreeMap<String, Tag>,
 
     /// An array of Server Objects, which provide connectivity information to a target server
@@ -28,10 +25,7 @@ pub struct Opg {
     pub servers: Vec<Server>,
 
     /// The available paths and operations for the API
-    #[serde(
-        serialize_with = "serialize_ordered_entries",
-        skip_serializing_if = "Vec::is_empty"
-    )]
+    #[serde(serialize_with = "serialize_ordered_entries", skip_serializing_if = "Vec::is_empty")]
     pub paths: Vec<(Path, PathValue)>,
 
     /// An element to hold various schemas for the specification
@@ -50,10 +44,7 @@ impl Default for OpenApiVersion {
 }
 
 /// Serialize slice of tuples as map
-fn serialize_ordered_entries<S, T1, T2>(
-    entries: &[(T1, T2)],
-    serializer: S,
-) -> Result<S::Ok, S::Error>
+fn serialize_ordered_entries<S, T1, T2>(entries: &[(T1, T2)], serializer: S) -> Result<S::Ok, S::Error>
 where
     T1: Serialize,
     T2: Serialize,
@@ -61,9 +52,7 @@ where
 {
     let mut ser = serializer.serialize_map(Some(entries.len()))?;
 
-    entries
-        .iter()
-        .try_for_each(|(key, value)| ser.serialize_entry(key, value))?;
+    entries.iter().try_for_each(|(key, value)| ser.serialize_entry(key, value))?;
 
     ser.end()
 }
@@ -188,10 +177,7 @@ pub struct PathValue {
     pub operations: BTreeMap<HttpMethod, Operation>,
 
     /// A list of parameters that are applicable for all the operations described under this path
-    #[serde(
-        skip_serializing_if = "BTreeMap::is_empty",
-        serialize_with = "serialize_parameters"
-    )]
+    #[serde(skip_serializing_if = "BTreeMap::is_empty", serialize_with = "serialize_parameters")]
     pub parameters: BTreeMap<String, OperationParameter>,
 }
 
@@ -266,10 +252,7 @@ pub struct Operation {
     pub responses: BTreeMap<u16, Response>,
 
     /// A list of parameters that are applicable for this operation
-    #[serde(
-        skip_serializing_if = "BTreeMap::is_empty",
-        serialize_with = "serialize_parameters"
-    )]
+    #[serde(skip_serializing_if = "BTreeMap::is_empty", serialize_with = "serialize_parameters")]
     pub parameters: BTreeMap<String, OperationParameter>,
 }
 
@@ -305,9 +288,7 @@ impl Serialize for RequestBody {
             required: self.required,
             description: &self.description,
             content: ResponseContent {
-                media_type: ResponseMediaType {
-                    schema: &self.schema,
-                },
+                media_type: ResponseMediaType { schema: &self.schema },
             },
         }
         .serialize(serializer)
@@ -370,10 +351,7 @@ struct ResponseContent<'a> {
 }
 
 /// Serialize map of parameters as sequence
-fn serialize_parameters<S>(
-    parameters: &BTreeMap<String, OperationParameter>,
-    serializer: S,
-) -> Result<S::Ok, S::Error>
+fn serialize_parameters<S>(parameters: &BTreeMap<String, OperationParameter>, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
@@ -485,8 +463,7 @@ impl Components {
         SecurityScheme: From<T>,
     {
         if !self.security_schemes.contains_key(&name) {
-            self.security_schemes
-                .insert(name.clone(), security_scheme.clone().into());
+            self.security_schemes.insert(name.clone(), security_scheme.clone().into());
         }
         name
     }
@@ -507,9 +484,7 @@ impl Components {
     where
         N: ToString,
     {
-        if let std::collections::btree_map::Entry::Vacant(entry) =
-            self.schemas.entry(name.to_string())
-        {
+        if let std::collections::btree_map::Entry::Vacant(entry) = self.schemas.entry(name.to_string()) {
             entry.insert(model);
         }
     }
@@ -530,11 +505,7 @@ pub trait OpgModel {
 
     /// Get link or inlined schema with context parameters applied
     #[inline]
-    fn select_reference(
-        cx: &mut Components,
-        inline: bool,
-        params: &ContextParams,
-    ) -> ModelReference {
+    fn select_reference(cx: &mut Components, inline: bool, params: &ContextParams) -> ModelReference {
         match Self::type_name() {
             Some(link) if !inline => ModelReference::Link(link.to_owned()),
             _ => ModelReference::Inline(Self::get_schema(cx).apply_params(params)),
@@ -717,15 +688,9 @@ impl ModelTypeDescription {
     #[inline]
     pub fn apply_params(self, params: &ContextParams) -> Self {
         match self {
-            ModelTypeDescription::String(string) => {
-                ModelTypeDescription::String(string.apply_params(params))
-            }
-            ModelTypeDescription::Number(number) => {
-                ModelTypeDescription::Number(number.apply_params(params))
-            }
-            ModelTypeDescription::Integer(integer) => {
-                ModelTypeDescription::Integer(integer.apply_params(params))
-            }
+            ModelTypeDescription::String(string) => ModelTypeDescription::String(string.apply_params(params)),
+            ModelTypeDescription::Number(number) => ModelTypeDescription::Number(number.apply_params(params)),
+            ModelTypeDescription::Integer(integer) => ModelTypeDescription::Integer(integer.apply_params(params)),
             other => other,
         }
     }
@@ -828,12 +793,7 @@ pub struct ModelObject {
 
 impl ModelObject {
     /// Manually add property
-    pub fn add_property(
-        &mut self,
-        property: String,
-        property_type: ModelReference,
-        is_required: bool,
-    ) -> Result<(), ()> {
+    pub fn add_property(&mut self, property: String, property_type: ModelReference, is_required: bool) -> Result<(), ()> {
         let entry = match self.properties.entry(property.clone()) {
             Entry::Vacant(entry) => entry,
             _ => return Err(()),
@@ -853,20 +813,15 @@ impl ModelObject {
         another
             .properties
             .into_iter()
-            .try_for_each(
-                |(property, property_model)| match self.properties.entry(property) {
-                    Entry::Vacant(entry) => {
-                        entry.insert(property_model);
-                        Ok(())
-                    }
-                    _ => Err(()),
-                },
-            )?;
+            .try_for_each(|(property, property_model)| match self.properties.entry(property) {
+                Entry::Vacant(entry) => {
+                    entry.insert(property_model);
+                    Ok(())
+                }
+                _ => Err(()),
+            })?;
 
-        another
-            .required
-            .into_iter()
-            .for_each(|property| self.required.push(property));
+        another.required.into_iter().for_each(|property| self.required.push(property));
 
         Ok(())
     }
@@ -910,10 +865,7 @@ where
     S: Serializer,
 {
     let mut ser = serializer.serialize_map(Some(1))?;
-    ser.serialize_entry(
-        "$ref",
-        &format!("{}{}", crate::SCHEMA_REFERENCE_PREFIX, name),
-    )?;
+    ser.serialize_entry("$ref", &format!("{}{}", crate::SCHEMA_REFERENCE_PREFIX, name))?;
     ser.end()
 }
 

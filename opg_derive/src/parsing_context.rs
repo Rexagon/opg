@@ -1,5 +1,6 @@
-use quote::ToTokens;
 use std::cell::RefCell;
+
+use quote::ToTokens;
 
 #[derive(Default)]
 pub struct ParsingContext {
@@ -22,7 +23,7 @@ impl ParsingContext {
             .borrow_mut()
             .as_mut()
             .unwrap()
-            .push(syn::Error::new_spanned(object.into_token_stream(), message))
+            .push(syn::Error::new_spanned(object, message))
     }
 
     pub fn syn_error(&self, err: syn::Error) {

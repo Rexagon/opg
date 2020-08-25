@@ -3,7 +3,7 @@ pub mod models;
 
 pub use macros::*;
 pub use models::*;
-pub use opg_derive::{OpgModel, path};
+pub use opg_derive::{path, OpgModel};
 
 pub const OPENAPI_VERSION: &str = "3.0.3";
 pub const SCHEMA_REFERENCE_PREFIX: &str = "#/components/schemas/";

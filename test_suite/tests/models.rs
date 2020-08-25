@@ -311,8 +311,7 @@ required:
     fn hash_map() {
         let mut cx = &mut Components::default();
         assert_eq!(
-            serde_yaml::to_string(&std::collections::HashMap::<&str, i32>::get_schema(&mut cx))
-                .unwrap(),
+            serde_yaml::to_string(&std::collections::HashMap::<&str, i32>::get_schema(&mut cx)).unwrap(),
             r##"---
 type: object
 additionalProperties:
@@ -534,10 +533,7 @@ additionalProperties:
                 type_description: ModelTypeDescription::Object(ModelObject {
                     properties: {
                         let mut properties = std::collections::BTreeMap::new();
-                        properties.insert(
-                            "id".to_owned(),
-                            ModelReference::Link("TransactionId".to_owned()),
-                        );
+                        properties.insert("id".to_owned(), ModelReference::Link("TransactionId".to_owned()));
                         properties.insert(
                             "amount".to_owned(),
                             ModelReference::Inline(Model {

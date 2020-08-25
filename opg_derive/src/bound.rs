@@ -66,10 +66,7 @@ pub fn with_bound(
         }
     }
 
-    let all_type_params = generics
-        .type_params()
-        .map(|param| param.ident.clone())
-        .collect();
+    let all_type_params = generics.type_params().map(|param| param.ident.clone()).collect();
 
     let mut visitor = FindTyParams {
         all_type_params,
@@ -80,10 +77,7 @@ pub fn with_bound(
     match &cont.data {
         Data::Enum(variants) => {
             for variant in variants.iter() {
-                let relevant_fields = variant
-                    .fields
-                    .iter()
-                    .filter(|field| filter(&field.attrs, Some(&variant.attrs)));
+                let relevant_fields = variant.fields.iter().filter(|field| filter(&field.attrs, Some(&variant.attrs)));
 
                 for field in relevant_fields {
                     visitor.visit_field(field.original);
@@ -126,10 +120,7 @@ pub fn with_bound(
         });
 
     let mut generics = generics.clone();
-    generics
-        .make_where_clause()
-        .predicates
-        .extend(new_predicates);
+    generics.make_where_clause().predicates.extend(new_predicates);
     generics
 }
 

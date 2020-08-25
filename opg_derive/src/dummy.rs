@@ -1,8 +1,4 @@
-pub fn wrap_in_const(
-    trait_: &str,
-    ty: &syn::Ident,
-    code: proc_macro2::TokenStream,
-) -> proc_macro2::TokenStream {
+pub fn wrap_in_const(trait_: &str, ty: &syn::Ident, code: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
     let dummy_const = if cfg!(underscore_consts) {
         quote::format_ident!("_")
     } else {

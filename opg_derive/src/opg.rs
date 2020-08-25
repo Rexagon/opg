@@ -7,9 +7,7 @@ use crate::bound;
 use crate::dummy;
 use crate::parsing_context::*;
 
-pub fn impl_derive_opg_model(
-    input: syn::DeriveInput,
-) -> Result<proc_macro2::TokenStream, Vec<syn::Error>> {
+pub fn impl_derive_opg_model(input: syn::DeriveInput) -> Result<proc_macro2::TokenStream, Vec<syn::Error>> {
     let cx = ParsingContext::new();
     let container = match Container::from_ast(&cx, &input) {
         Some(container) => container,
@@ -40,9 +38,7 @@ fn build_generics(cont: &Container) -> syn::Generics {
     bound::with_bound(
         cont,
         &generics,
-        |field, variant| {
-            !field.skip_serializing && variant.map_or(true, |variant| !variant.skip_serializing)
-        },
+        |field, variant| !field.skip_serializing && variant.map_or(true, |variant| !variant.skip_serializing),
         &syn::parse_quote!(_opg::OpgModel),
     )
 }
@@ -52,9 +48,7 @@ fn serialize_body(container: &Container) -> proc_macro2::TokenStream {
         Data::Enum(variants) => serialize_enum(container, variants),
         Data::Struct(StructStyle::Struct, fields) => serialize_struct(container, fields),
         Data::Struct(StructStyle::Tuple, fields) => serialize_tuple_struct(container, fields),
-        Data::Struct(StructStyle::NewType, fields) => {
-            serialize_newtype_struct(container, &fields[0])
-        }
+        Data::Struct(StructStyle::NewType, fields) => serialize_newtype_struct(container, &fields[0]),
         _ => unimplemented!(),
     }
 }
@@ -62,14 +56,10 @@ fn serialize_body(container: &Container) -> proc_macro2::TokenStream {
 fn serialize_enum(container: &Container, variants: &[Variant]) -> proc_macro2::TokenStream {
     match (container.attrs.model_type, &container.attrs.tag_type) {
         (ModelType::NewType, _) => serialize_newtype_enum(container, variants),
-        (ModelType::Object, TagType::Adjacent { tag, content }) => {
-            serialize_adjacent_tagged_enum(container, variants, tag, content)
-        }
+        (ModelType::Object, TagType::Adjacent { tag, content }) => serialize_adjacent_tagged_enum(container, variants, tag, content),
         (ModelType::Dictionary, _) => serialize_external_tagged_enum(container, variants),
         (ModelType::OneOf, TagType::None) => serialize_untagged_enum(container, variants),
-        (ModelType::OneOf, TagType::Internal { tag }) => {
-            serialize_internal_tagged_enum(container, variants, tag)
-        }
+        (ModelType::OneOf, TagType::Internal { tag }) => serialize_internal_tagged_enum(container, variants, tag),
         _ => unreachable!(),
     }
 }
@@ -145,10 +135,7 @@ fn serialize_newtype_enum(container: &Container, variants: &[Variant]) -> proc_m
     implement_type(&container.ident, body, container.attrs.inline)
 }
 
-fn serialize_untagged_enum(
-    container: &Container,
-    variants: &[Variant],
-) -> proc_macro2::TokenStream {
+fn serialize_untagged_enum(container: &Container, variants: &[Variant]) -> proc_macro2::TokenStream {
     let description = option_string(container.attrs.description.as_deref());
 
     let one_of = variants
@@ -161,12 +148,9 @@ fn serialize_untagged_enum(
 
                 field_model_reference(context_params, field, variant.attrs.inline)
             }
-            StructStyle::Struct => inline_reference(object_model(
-                false,
-                &variant.attrs.description,
-                &variant.fields,
-                |field| variant.attrs.inline || field.attrs.inline,
-            )),
+            StructStyle::Struct => inline_reference(object_model(false, &variant.attrs.description, &variant.fields, |field| {
+                variant.attrs.inline || field.attrs.inline
+            })),
             _ => unreachable!(),
         })
         .collect::<Vec<_>>();
@@ -183,50 +167,36 @@ fn serialize_untagged_enum(
     implement_type(&container.ident, body, container.attrs.inline)
 }
 
-fn serialize_adjacent_tagged_enum(
-    container: &Container,
-    variants: &[Variant],
-    tag: &str,
-    content: &str,
-) -> proc_macro2::TokenStream {
+fn serialize_adjacent_tagged_enum(container: &Container, variants: &[Variant], tag: &str, content: &str) -> proc_macro2::TokenStream {
     let description = option_string(container.attrs.description.as_deref());
     let nullable = container.attrs.nullable;
 
-    let (variants, one_of) = variants
-        .iter()
-        .filter(|variant| !variant.attrs.skip_serializing)
-        .fold(
-            (Vec::new(), Vec::new()),
-            |(mut variants, mut one_of), variant| {
-                let variant_name = variant.attrs.name.serialized();
+    let (variants, one_of) = variants.iter().filter(|variant| !variant.attrs.skip_serializing).fold(
+        (Vec::new(), Vec::new()),
+        |(mut variants, mut one_of), variant| {
+            let variant_name = variant.attrs.name.serialized();
 
-                let type_description = match &variant.style {
-                    StructStyle::NewType => {
-                        let field = &variant.fields[0];
-                        let context_params = ContextParams::from(&field.attrs).or(&variant.attrs);
+            let type_description = match &variant.style {
+                StructStyle::NewType => {
+                    let field = &variant.fields[0];
+                    let context_params = ContextParams::from(&field.attrs).or(&variant.attrs);
 
-                        field_model_reference(context_params, field, variant.attrs.inline)
-                    }
-                    StructStyle::Tuple => inline_reference(tuple_model(
-                        false,
-                        &variant.attrs.description,
-                        &variant.fields,
-                        |field| variant.attrs.inline || field.attrs.inline,
-                    )),
-                    StructStyle::Struct => inline_reference(tuple_model(
-                        false,
-                        &variant.attrs.description,
-                        &variant.fields,
-                        |field| field.attrs.inline || variant.attrs.inline,
-                    )),
-                    _ => unreachable!(),
-                };
+                    field_model_reference(context_params, field, variant.attrs.inline)
+                }
+                StructStyle::Tuple => inline_reference(tuple_model(false, &variant.attrs.description, &variant.fields, |field| {
+                    variant.attrs.inline || field.attrs.inline
+                })),
+                StructStyle::Struct => inline_reference(tuple_model(false, &variant.attrs.description, &variant.fields, |field| {
+                    field.attrs.inline || variant.attrs.inline
+                })),
+                _ => unreachable!(),
+            };
 
-                variants.push(variant_name);
-                one_of.push(type_description);
-                (variants, one_of)
-            },
-        );
+            variants.push(variant_name);
+            one_of.push(type_description);
+            (variants, one_of)
+        },
+    );
 
     let type_example = option_string(variants.first().map(|x| x.as_str()));
     let type_name_stringified = container.ident.to_string();
@@ -286,73 +256,56 @@ fn serialize_adjacent_tagged_enum(
     implement_type(&container.ident, body, container.attrs.inline)
 }
 
-fn serialize_external_tagged_enum(
-    container: &Container,
-    variants: &[Variant],
-) -> proc_macro2::TokenStream {
+fn serialize_external_tagged_enum(container: &Container, variants: &[Variant]) -> proc_macro2::TokenStream {
     let description = option_string(container.attrs.description.as_deref());
     let nullable = container.attrs.nullable;
 
-    let (_, one_of) = variants
-        .iter()
-        .filter(|variant| !variant.attrs.skip_serializing)
-        .fold(
-            (Vec::new(), Vec::new()),
-            |(mut variants, mut one_of), variant| {
-                let variant_name = variant.attrs.name.serialized();
+    let (_, one_of) = variants.iter().filter(|variant| !variant.attrs.skip_serializing).fold(
+        (Vec::new(), Vec::new()),
+        |(mut variants, mut one_of), variant| {
+            let variant_name = variant.attrs.name.serialized();
 
-                let type_description = match &variant.style {
-                    StructStyle::Unit => {
-                        let description = option_string(variant.attrs.description.as_deref());
+            let type_description = match &variant.style {
+                StructStyle::Unit => {
+                    let description = option_string(variant.attrs.description.as_deref());
 
-                        quote! {
-                            _opg::ModelReference::Inline(
-                                _opg::Model {
-                                    description: #description,
-                                    data: _opg::ModelData::Single(_opg::ModelType {
-                                        nullable: false,
-                                        type_description: _opg::ModelTypeDescription::String(_opg::ModelString {
-                                            variants: Some(vec![#variant_name.to_owned()]),
-                                            data: _opg::ModelSimple {
-                                                format: None,
-                                                example: Some(#variant_name.to_owned()),
-                                            }
-                                        })
+                    quote! {
+                        _opg::ModelReference::Inline(
+                            _opg::Model {
+                                description: #description,
+                                data: _opg::ModelData::Single(_opg::ModelType {
+                                    nullable: false,
+                                    type_description: _opg::ModelTypeDescription::String(_opg::ModelString {
+                                        variants: Some(vec![#variant_name.to_owned()]),
+                                        data: _opg::ModelSimple {
+                                            format: None,
+                                            example: Some(#variant_name.to_owned()),
+                                        }
                                     })
-                                }
-                            )
-                        }
-                    }
-                    StructStyle::NewType => {
-                        let field = &variant.fields[0];
-                        let context_params = ContextParams::from(&field.attrs).or(&variant.attrs);
-
-                        field_model_reference(
-                            context_params,
-                            field,
-                            variant.attrs.inline,
+                                })
+                            }
                         )
-                    },
-                    StructStyle::Tuple => {
-                        inline_reference(tuple_model(false,
-                            &variant.attrs.description, &variant.fields, |field| {
-                            variant.attrs.inline || field.attrs.inline
-                        }))
                     }
-                    StructStyle::Struct => inline_reference(object_model(false,
-                        &variant.attrs.description,
-                        &variant.fields,
-                        |field| {
-                            variant.attrs.inline || field.attrs.inline
-                        },
-                    )),
-                };
+                }
+                StructStyle::NewType => {
+                    let field = &variant.fields[0];
+                    let context_params = ContextParams::from(&field.attrs).or(&variant.attrs);
 
-                variants.push(variant_name);
-                one_of.push(type_description);
-                (variants, one_of)
-            },
-        );
+                    field_model_reference(context_params, field, variant.attrs.inline)
+                }
+                StructStyle::Tuple => inline_reference(tuple_model(false, &variant.attrs.description, &variant.fields, |field| {
+                    variant.attrs.inline || field.attrs.inline
+                })),
+                StructStyle::Struct => inline_reference(object_model(false, &variant.attrs.description, &variant.fields, |field| {
+                    variant.attrs.inline || field.attrs.inline
+                })),
+            };
+
+            variants.push(variant_name);
+            one_of.push(type_description);
+            (variants, one_of)
+        },
+    );
 
     let body = quote! {
         _opg::Model {
@@ -379,11 +332,7 @@ fn serialize_external_tagged_enum(
     implement_type(&container.ident, body, container.attrs.inline)
 }
 
-fn serialize_internal_tagged_enum(
-    container: &Container,
-    variants: &[Variant],
-    tag: &str,
-) -> proc_macro2::TokenStream {
+fn serialize_internal_tagged_enum(container: &Container, variants: &[Variant], tag: &str) -> proc_macro2::TokenStream {
     let description = option_string(container.attrs.description.as_deref());
     let nullable = container.attrs.nullable;
 
@@ -396,9 +345,7 @@ fn serialize_internal_tagged_enum(
             let variant_name = variant.attrs.name.serialized();
 
             let model = match &variant.style {
-                StructStyle::Unit => {
-                    object_model(false, &variant.attrs.description, &[], |_| false)
-                }
+                StructStyle::Unit => object_model(false, &variant.attrs.description, &[], |_| false),
                 StructStyle::NewType => {
                     let field = &variant.fields[0];
                     let type_name = &field.original.ty;
@@ -408,11 +355,9 @@ fn serialize_internal_tagged_enum(
                         <#type_name as _opg::OpgModel>::get_schema_with_params(cx, &#context_params)
                     }
                 }
-                StructStyle::Struct => {
-                    object_model(false, &variant.attrs.description, &variant.fields, |field| {
-                        variant.attrs.inline || field.attrs.inline
-                    })
-                }
+                StructStyle::Struct => object_model(false, &variant.attrs.description, &variant.fields, |field| {
+                    variant.attrs.inline || field.attrs.inline
+                }),
                 _ => unreachable!(),
             };
 
@@ -517,11 +462,7 @@ fn serialize_newtype_struct(container: &Container, field: &Field) -> proc_macro2
 
     let body = match container.attrs.explicit_model_type {
         Some(explicit_model_type) if explicit_model_type != ExplicitModelType::Any => {
-            newtype_model(
-                container.attrs.nullable,
-                context_params,
-                explicit_model_type,
-            )
+            newtype_model(container.attrs.nullable, context_params, explicit_model_type)
         }
         Some(_) => unreachable!(),
         None => {
@@ -536,12 +477,7 @@ fn serialize_newtype_struct(container: &Container, field: &Field) -> proc_macro2
     implement_type(&container.ident, body, container.attrs.inline)
 }
 
-fn tuple_model<P>(
-    nullable: bool,
-    description: &Option<String>,
-    fields: &[Field],
-    inline_predicate: P,
-) -> proc_macro2::TokenStream
+fn tuple_model<P>(nullable: bool, description: &Option<String>, fields: &[Field], inline_predicate: P) -> proc_macro2::TokenStream
 where
     P: Fn(&Field) -> bool,
 {
@@ -559,12 +495,7 @@ where
     }
 }
 
-fn object_model<P>(
-    nullable: bool,
-    description: &Option<String>,
-    fields: &[Field],
-    inline_predicate: P,
-) -> proc_macro2::TokenStream
+fn object_model<P>(nullable: bool, description: &Option<String>, fields: &[Field], inline_predicate: P) -> proc_macro2::TokenStream
 where
     P: Fn(&Field) -> bool,
 {
@@ -594,13 +525,7 @@ where
 {
     let data = fields
         .iter()
-        .map(|field| {
-            field_model_reference(
-                ContextParams::from(&field.attrs),
-                field,
-                inline_predicate(field),
-            )
-        })
+        .map(|field| field_model_reference(ContextParams::from(&field.attrs), field, inline_predicate(field)))
         .collect::<Vec<_>>();
 
     let one_of = quote! {
@@ -629,11 +554,7 @@ where
         .iter()
         .filter(|field| !field.attrs.skip_serializing)
         .map(|field| {
-            let field_model_reference = field_model_reference(
-                ContextParams::from(&field.attrs),
-                &field,
-                inline_predicate(field),
-            );
+            let field_model_reference = field_model_reference(ContextParams::from(&field.attrs), &field, inline_predicate(field));
 
             let property_name = syn::LitStr::new(&field.attrs.name.serialized(), Span::call_site());
 
@@ -668,11 +589,7 @@ where
     }
 }
 
-fn field_model_reference<'a>(
-    context_params: ContextParams<'a>,
-    field: &'a Field,
-    inline: bool,
-) -> proc_macro2::TokenStream {
+fn field_model_reference<'a>(context_params: ContextParams<'a>, field: &'a Field, inline: bool) -> proc_macro2::TokenStream {
     let type_name = &field.original.ty;
 
     match field.attrs.explicit_model_type {
@@ -698,11 +615,7 @@ fn field_model_reference<'a>(
     }
 }
 
-fn newtype_model(
-    nullable: bool,
-    context_params: ContextParams,
-    explicit_model_type: ExplicitModelType,
-) -> proc_macro2::TokenStream {
+fn newtype_model(nullable: bool, context_params: ContextParams, explicit_model_type: ExplicitModelType) -> proc_macro2::TokenStream {
     let (description, format, example) = context_params.split();
 
     let data = match explicit_model_type {
@@ -762,11 +675,7 @@ fn option_bool(data: Option<bool>) -> proc_macro2::TokenStream {
     }
 }
 
-fn implement_type(
-    type_name: &syn::Ident,
-    body: proc_macro2::TokenStream,
-    inline: bool,
-) -> proc_macro2::TokenStream {
+fn implement_type(type_name: &syn::Ident, body: proc_macro2::TokenStream, inline: bool) -> proc_macro2::TokenStream {
     let inline = if inline {
         quote! {
             #[inline]
@@ -870,13 +779,7 @@ impl<'a> ContextParams<'a> {
         self
     }
 
-    fn split(
-        self,
-    ) -> (
-        proc_macro2::TokenStream,
-        proc_macro2::TokenStream,
-        proc_macro2::TokenStream,
-    ) {
+    fn split(self) -> (proc_macro2::TokenStream, proc_macro2::TokenStream, proc_macro2::TokenStream) {
         (
             option_string(self.description),
             option_string(self.format),
