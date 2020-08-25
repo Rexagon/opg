@@ -70,6 +70,9 @@ where
             PathContentKeyRef::Ident("security") => {
                 result.security = parse_group_list(&mut content_iter)?;
             }
+            PathContentKeyRef::Ident("body") => {
+                result.body = Some(parse_type_until(&mut content_iter, ',')?);
+            }
             PathContentKeyRef::Code(code, description) => {
                 println!("description: {:?}", description);
                 let response_model = parse_type_until(&mut content_iter, ',')?;
@@ -93,16 +96,20 @@ where
 fn parse_key<I>(input: &mut Peekable<I>) -> Option<PathContentKey>
 where
     I: Iterator<Item = TokenTree>,
+    Peekable<I>: Clone,
 {
-    let mut input_iter = input.peekable();
-    match input_iter.peek()? {
-        TokenTree::Ident(_) => parse_ident(&mut input_iter).map(PathContentKey::Ident),
+    match input.peek()? {
+        TokenTree::Ident(_) => parse_ident(input).map(PathContentKey::Ident),
         TokenTree::Literal(_) => {
-            let code = parse_integer(&mut input_iter)?;
+            let code = parse_integer(input)?;
             let mut description = None;
-            if let Some(TokenTree::Group(group)) = input_iter.peek() {
-                let mut input_iter = group.stream().into_iter();
-                description = Some(parse_string_or_ident(&mut input_iter)?);
+            println!(
+                "trying description: {:?}",
+                input.clone().collect::<TokenStream>().to_string()
+            );
+            if let Some(TokenTree::Group(group)) = input.peek() {
+                let mut desc_iter = group.stream().into_iter();
+                description = Some(parse_string_or_ident(&mut desc_iter)?);
             }
             Some(PathContentKey::Code(code, description))
         }
@@ -129,6 +136,12 @@ where
         "token stream: {:?}",
         address_iter.clone().collect::<TokenStream>()
     );
+
+    if let Some(TokenTree::Punct(punct)) = address_iter.peek() {
+        if punct.as_char() == '/' {
+            let _ = address_iter.next();
+        }
+    }
 
     let mut result = Vec::new();
     loop {
@@ -194,10 +207,13 @@ where
 {
     let mut input_iter = input.clone();
     let result = syn::parse::<syn::TypePath>(
-        input
-            .take_while(|_| match input_iter.peek() {
+        input_iter
+            .take_while(|_| match input.peek() {
                 Some(TokenTree::Punct(punct)) if punct.as_char() == delimiter => false,
-                _ => input_iter.next().is_some(),
+                item => {
+                    println!("take while: {:?}", item);
+                    input.next().is_some()
+                }
             })
             .collect(),
     );
@@ -327,6 +343,7 @@ struct PathContent {
     summary: Option<String>,
     description: Option<String>,
     security: Vec<String>,
+    body: Option<syn::TypePath>,
     responses: HashMap<u16, syn::TypePath>,
 }
 
