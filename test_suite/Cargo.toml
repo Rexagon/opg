@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 opg = { path = "../opg", features = [ "uuid", "chrono" ] }
+opg_derive = { path = "../opg_derive" }
 
 [dev-dependencies]
 chrono = { version = "0.4", features = ["serde"] }

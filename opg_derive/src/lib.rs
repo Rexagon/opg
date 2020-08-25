@@ -10,16 +10,25 @@ mod dummy;
 mod opg;
 mod parsing_context;
 mod symbol;
+mod path;
 
 use proc_macro::TokenStream;
 use quote::quote;
 
 use self::opg::*;
+use self::path::*;
 
 #[proc_macro_derive(OpgModel, attributes(opg))]
 pub fn derive_opg_model(input: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(input as syn::DeriveInput);
     impl_derive_opg_model(input)
+        .unwrap_or_else(to_compile_errors)
+        .into()
+}
+
+#[proc_macro_attribute]
+pub fn path(attr: TokenStream, input: TokenStream) -> TokenStream {
+    impl_path(attr, input)
         .unwrap_or_else(to_compile_errors)
         .into()
 }

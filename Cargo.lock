@@ -119,6 +119,7 @@ version = "0.0.0"
 dependencies = [
  "chrono",
  "opg",
+ "opg_derive",
  "serde",
  "serde_repr",
  "serde_yaml",
