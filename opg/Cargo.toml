@@ -23,3 +23,6 @@ opg_derive = { version = "0.0", path = "../opg_derive" }
 
 [package.metadata.docs.rs]
 targets = ["x86_64-unknown-linux-gnu"]
+
+[features]
+path_attr = ["opg_derive/path"]

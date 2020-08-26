@@ -9,13 +9,19 @@ use proc_macro2::{Delimiter, TokenStream, TokenTree};
 use crate::parsing_context::ParsingContext;
 
 lazy_static! {
-    static ref PATH_DESCRIPTIONS: Mutex<HashMap<Vec<PathSegment>, HashMap<HttpMethod, PathContent>>> = Mutex::new(Default::default());
+    pub static ref PATH_DESCRIPTIONS: Mutex<HashMap<Vec<PathSegment>, HashMap<HttpMethod, PathContent>>> = Mutex::new(Default::default());
 }
 
 pub fn impl_path(attr: proc_macro::TokenStream, item: proc_macro::TokenStream) -> Result<TokenStream, Vec<syn::Error>> {
     let cx = ParsingContext::new();
 
-    let _parsed = parse_path(&cx, attr.into());
+    let tt = TokenStream::from(attr);
+    let parsed = parse_path(&cx, tt.clone()).or_else(report_error(&cx, tt, "failed to generate path description"));
+
+    if let Some((method, path, content)) = parsed {
+        let mut path_descriptions = PATH_DESCRIPTIONS.lock().unwrap();
+        path_descriptions.entry(path).or_insert_with(HashMap::new).insert(method, content);
+    }
 
     cx.check().map(|_| item.into())
 }
@@ -390,7 +396,7 @@ where
 }
 
 #[derive(Debug)]
-enum PathContentKey {
+pub enum PathContentKey {
     Ident(String),
     Code(u16, Option<String>),
 }
@@ -410,28 +416,28 @@ enum PathContentKeyRef<'a> {
 }
 
 #[derive(Debug, Default)]
-struct PathContent {
-    tags: Vec<String>,
-    summary: Option<String>,
-    description: Option<String>,
-    security: Vec<String>,
-    parameters: HashMap<String, Parameter>,
-    body: Option<String>,
-    responses: HashMap<u16, String>,
+pub struct PathContent {
+    pub tags: Vec<String>,
+    pub summary: Option<String>,
+    pub description: Option<String>,
+    pub security: Vec<String>,
+    pub parameters: HashMap<String, Parameter>,
+    pub body: Option<String>,
+    pub responses: HashMap<u16, String>,
 }
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
-enum PathSegment {
+pub enum PathSegment {
     Path(String),
     Parameter(String),
 }
 
 #[derive(Debug, Clone)]
-struct Parameter {
-    description: Option<String>,
-    parameter_in: ParameterIn,
-    required: bool,
-    ty: String,
+pub struct Parameter {
+    pub description: Option<String>,
+    pub parameter_in: ParameterIn,
+    pub required: bool,
+    pub ty: String,
 }
 
 impl Parameter {
@@ -446,7 +452,7 @@ impl Parameter {
 }
 
 #[derive(Debug, Copy, Clone)]
-enum ParameterIn {
+pub enum ParameterIn {
     Query,
     Header,
     Path,
@@ -488,7 +494,7 @@ impl FromStr for ParameterIn {
 }
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
-enum HttpMethod {
+pub enum HttpMethod {
     GET,
     PUT,
     POST,

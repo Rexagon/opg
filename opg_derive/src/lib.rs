@@ -9,6 +9,7 @@ mod case;
 mod dummy;
 mod opg;
 mod parsing_context;
+#[cfg(feature = "path")]
 mod path;
 mod symbol;
 
@@ -16,6 +17,8 @@ use proc_macro::TokenStream;
 use quote::quote;
 
 use self::opg::*;
+
+#[cfg(feature = "path")]
 use self::path::*;
 
 #[proc_macro_derive(OpgModel, attributes(opg))]
@@ -24,6 +27,7 @@ pub fn derive_opg_model(input: TokenStream) -> TokenStream {
     impl_derive_opg_model(input).unwrap_or_else(to_compile_errors).into()
 }
 
+#[cfg(feature = "path")]
 #[proc_macro_attribute]
 pub fn path(attr: TokenStream, input: TokenStream) -> TokenStream {
     impl_path(attr, input).unwrap_or_else(to_compile_errors).into()

@@ -25,3 +25,6 @@ opg = { version = "0.0", path = "../opg" }
 
 [package.metadata.docs.rs]
 targets = ["x86_64-unknown-linux-gnu"]
+
+[features]
+path = []
