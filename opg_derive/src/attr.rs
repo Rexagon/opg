@@ -21,7 +21,7 @@ pub struct Container {
 
     pub description: Option<String>,
     pub format: Option<String>,
-    pub example: Option<String>,
+    pub example: Option<syn::Expr>,
     pub inline: bool,
     pub nullable: bool,
     pub explicit_model_type: Option<ExplicitModelType>,
@@ -119,7 +119,13 @@ impl Container {
                 }
                 (AttrFrom::Opg, Meta(NameValue(m))) if m.path == EXAMPLE => {
                     if let Ok(s) = get_lit_str(cx, EXAMPLE, &m.lit) {
-                        example.set(&m.path, s.value().clone())
+                        example.set(&m.path, lit_str_expr(s));
+                    }
+                }
+
+                (AttrFrom::Opg, Meta(NameValue(m))) if m.path == EXAMPLE_WITH => {
+                    if let Ok(expr) = parse_lit_into_expr(cx, EXAMPLE_WITH, &m.lit) {
+                        example.set(&m.path, expr);
                     }
                 }
                 (AttrFrom::Opg, Meta(Path(word))) if word == INLINE => inline.set_true(word),
@@ -177,7 +183,7 @@ pub struct Variant {
 
     pub description: Option<String>,
     pub format: Option<String>,
-    pub example: Option<String>,
+    pub example: Option<syn::Expr>,
     pub inline: bool,
     pub explicit_model_type: Option<ExplicitModelType>,
 }
@@ -241,7 +247,13 @@ impl Variant {
                 }
                 (AttrFrom::Opg, Meta(NameValue(m))) if m.path == EXAMPLE => {
                     if let Ok(s) = get_lit_str(cx, EXAMPLE, &m.lit) {
-                        example.set(&m.path, s.value().clone())
+                        example.set(&m.path, lit_str_expr(s))
+                    }
+                }
+
+                (AttrFrom::Opg, Meta(NameValue(m))) if m.path == EXAMPLE_WITH => {
+                    if let Ok(expr) = parse_lit_into_expr(cx, EXAMPLE_WITH, &m.lit) {
+                        example.set(&m.path, expr);
                     }
                 }
                 (AttrFrom::Opg, Meta(Path(word))) if word == INLINE => inline.set_true(word),
@@ -293,7 +305,7 @@ pub struct Field {
     pub optional: bool,
     pub description: Option<String>,
     pub format: Option<String>,
-    pub example: Option<String>,
+    pub example: Option<syn::Expr>,
     pub inline: bool,
     pub nullable: bool,
     pub explicit_model_type: Option<ExplicitModelType>,
@@ -360,7 +372,12 @@ impl Field {
                 }
                 (AttrFrom::Opg, Meta(NameValue(m))) if m.path == EXAMPLE => {
                     if let Ok(s) = get_lit_str(cx, EXAMPLE, &m.lit) {
-                        example.set(&m.path, s.value().clone())
+                        example.set(&m.path, lit_str_expr(s))
+                    }
+                }
+                (AttrFrom::Opg, Meta(NameValue(m))) if m.path == EXAMPLE_WITH => {
+                    if let Ok(expr) = parse_lit_into_expr(cx, EXAMPLE_WITH, &m.lit) {
+                        example.set(&m.path, expr);
                     }
                 }
                 (AttrFrom::Opg, Meta(Path(word))) if word == OPTIONAL => optional.set_true(word),
@@ -538,6 +555,24 @@ fn get_ser<'c, 'm>(
     }
 
     Ok(ser_meta)
+}
+
+fn lit_str_expr(lit: &syn::LitStr) -> syn::Expr {
+    syn::Expr::Lit(syn::ExprLit {
+        attrs: Vec::new(),
+        lit: syn::Lit::Str(lit.clone()),
+    })
+}
+
+fn parse_lit_into_expr(
+    cx: &ParsingContext,
+    attr_name: Symbol,
+    lit: &syn::Lit,
+) -> Result<syn::Expr, ()> {
+    let string = get_lit_str(cx, attr_name, lit)?;
+    parse_lit_str(string).map_err(|_| {
+        cx.error_spanned_by(lit, format!("failed to parse expr: {:?}", string.value()))
+    })
 }
 
 fn parse_lit_into_expr_path(

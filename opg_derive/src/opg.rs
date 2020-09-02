@@ -744,6 +744,15 @@ fn newtype_model(
     }
 }
 
+fn option_to_string_expr(data: Option<&syn::Expr>) -> proc_macro2::TokenStream {
+    match data {
+        Some(data) => {
+            quote! { Some((#data).to_string()) }
+        }
+        None => quote! { None },
+    }
+}
+
 fn option_string(data: Option<&str>) -> proc_macro2::TokenStream {
     match data {
         Some(data) => {
@@ -802,7 +811,7 @@ struct ContextParams<'a> {
     description: Option<&'a str>,
     nullable: Option<bool>,
     format: Option<&'a str>,
-    example: Option<&'a str>,
+    example: Option<&'a syn::Expr>,
 }
 
 impl<'a> From<&'a attr::Container> for ContextParams<'a> {
@@ -811,7 +820,7 @@ impl<'a> From<&'a attr::Container> for ContextParams<'a> {
             .description(attrs.description.as_deref())
             .nullable(if attrs.nullable { Some(true) } else { None })
             .format(attrs.format.as_deref())
-            .example(attrs.example.as_deref())
+            .example(attrs.example.as_ref())
     }
 }
 
@@ -820,7 +829,7 @@ impl<'a> From<&'a attr::Variant> for ContextParams<'a> {
         Self::new()
             .description(attrs.description.as_deref())
             .format(attrs.format.as_deref())
-            .example(attrs.example.as_deref())
+            .example(attrs.example.as_ref())
     }
 }
 
@@ -830,7 +839,7 @@ impl<'a> From<&'a attr::Field> for ContextParams<'a> {
             .description(attrs.description.as_deref())
             .nullable(if attrs.nullable { Some(true) } else { None })
             .format(attrs.format.as_deref())
-            .example(attrs.example.as_deref())
+            .example(attrs.example.as_ref())
     }
 }
 
@@ -854,7 +863,7 @@ impl<'a> ContextParams<'a> {
         self
     }
 
-    fn example(mut self, example: Option<&'a str>) -> Self {
+    fn example(mut self, example: Option<&'a syn::Expr>) -> Self {
         self.example = example;
         self
     }
@@ -880,7 +889,7 @@ impl<'a> ContextParams<'a> {
         (
             option_string(self.description),
             option_string(self.format),
-            option_string(self.example),
+            option_to_string_expr(self.example),
         )
     }
 
@@ -888,7 +897,7 @@ impl<'a> ContextParams<'a> {
         let description = option_string(self.description);
         let nullable = option_bool(self.nullable);
         let format = option_string(self.format);
-        let example = option_string(self.example);
+        let example = option_to_string_expr(self.example);
 
         quote! {
             _opg::ContextParams {

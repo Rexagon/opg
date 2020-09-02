@@ -14,6 +14,7 @@ define_symbols! {
 
     // named values
     EXAMPLE => "example",
+    EXAMPLE_WITH => "example_with",
     FORMAT => "format",
     DESCRIPTION => "description",
 

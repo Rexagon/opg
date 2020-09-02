@@ -398,6 +398,33 @@ required:
         },
     }
 
+    #[derive(Debug, Default, Serialize, OpgModel)]
+    #[opg(example_with = "now()")]
+    struct ExampleWith(u64);
+
+    fn now() -> u64 {
+        use std::time::{Duration, SystemTime};
+
+        // let now = SystemTime::now();
+        let now = SystemTime::UNIX_EPOCH + Duration::from_secs(1599083980);
+
+        now.duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+    }
+
+    #[test]
+    fn example_with() {
+        let mut cx = &mut Components::default();
+        assert_eq!(
+            serde_yaml::to_string(&ExampleWith::get_schema(&mut cx)).unwrap(),
+            r##"---
+type: integer
+format: uint64
+example: "1599083980""##
+        );
+    }
+
     #[derive(Debug, Serialize, OpgModel)]
     #[opg("Test")]
     struct GenericStruct<T> {
