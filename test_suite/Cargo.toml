@@ -9,6 +9,7 @@ opg = { path = "../opg", features = [ "uuid", "chrono" ] }
 
 [dev-dependencies]
 chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "0.8" }
 serde = "1.0"
 serde_yaml = "0.8"
 serde_repr = "0.1"

@@ -17,7 +17,7 @@ impl<T> FromStrangeTuple<T> for (T,) {
 }
 
 #[macro_export]
-macro_rules! describe_type(
+macro_rules! describe_type (
     (raw_model => $model:ident) => {
         $model
     };
@@ -163,7 +163,7 @@ macro_rules! describe_type(
 );
 
 #[macro_export]
-macro_rules! impl_opg_model(
+macro_rules! impl_opg_model (
     (generic_simple(nullable$(, ?$sized:ident)?): $($type:tt)+) => {
         impl<T> $crate::OpgModel for $($type)+
         where
@@ -446,19 +446,30 @@ macro_rules! describe_api {
     (@opg_security_scheme_api_key $parameter_in:ident $name:ident $description:ident $(,)?) => {};
 
 
-    (@opg_property $result:ident paths $(($first_path_segment:tt$( / $path_segment:tt)*): {
+    (@opg_property $result:ident paths $(($($path_segment:tt)+): {
         $($properties:tt)*
     }),*$(,)?) => {{
         $({
             let mut path = Vec::new();
             let mut context = $crate::models::PathValue::default();
 
-            describe_api!(@opg_path_url path $result context $first_path_segment $($path_segment)*);
+            describe_api!(@opg_property_url path $result context { $($path_segment)* });
             describe_api!(@opg_path_value_properties $result context $($properties)*,);
 
             $result.paths.push(($crate::models::Path(path), context));
         };)*
     }};
+
+    (@opg_property_url $path:ident $result:ident $context:ident { / $($rest:tt)* } $($current:tt)+) => {
+        describe_api!(@opg_path_url $path $result $context $($current)*);
+        describe_api!(@opg_property_url $path $result $context { $($rest)* } )
+    };
+    (@opg_property_url $path:ident $result:ident $context:ident {} $($current:tt)+) => {
+        describe_api!(@opg_path_url $path $result $context $($current)*)
+    };
+    (@opg_property_url $path:ident $result:ident $context:ident { $next:tt $($rest:tt)* } $($current:tt)*) => {
+        describe_api!(@opg_property_url $path $result $context { $($rest)* } $($current)* $next )
+    };
 
 
     (@opg_path_value_properties $result:ident $context:ident $field:ident: $value:literal, $($other:tt)*) => {
@@ -648,26 +659,29 @@ macro_rules! describe_api {
     (@opg_path_value_parameter_properties $result:ident $context:ident $(,)?) => {};
 
 
-    (@opg_path_url $path:ident $result:ident $context:ident $current:tt $($other:tt)*) => {
+    (@opg_path_url $path:ident $result:ident $context:ident $current:literal) => {
+        $path.push($crate::models::PathElement::Path($current.to_owned()));
+    };
+    (@opg_path_url $path:ident $result:ident $context:ident $current:path) => {
+        $path.push({
+            let name = {
+                let full_name = stringify!($current);
+                let name = &full_name[full_name.rfind(':').map(|i| i + 1).unwrap_or_default()..];
+                name[..1].to_ascii_lowercase() + &name[1..]
+            };
+            describe_api!(@opg_path_insert_url_param $result $context name $current)
+        });
+    };
+    (@opg_path_url $path:ident $result:ident $context:ident {$name:ident: $parameter:path}) => {
+        $path.push({
+            let name = stringify!($name).to_owned();
+            describe_api!(@opg_path_insert_url_param $result $context name $parameter)
+        });
+    };
+    (@opg_path_url $path:ident $result:ident $context:ident $current:literal) => {
         $path.push(describe_api!(@opg_path_url_element $result $context $current));
-        describe_api!(@opg_path_url $path $result $context $($other)*)
     };
-    (@opg_path_url $path:ident $result:ident $context:ident) => {};
 
-    (@opg_path_url_element $result:ident $context:ident $segment:literal) => {
-        $crate::models::PathElement::Path($segment.to_owned())
-    };
-    (@opg_path_url_element $result:ident $context:ident $parameter:path) => {{
-        let name = {
-            let name = stringify!($parameter);
-            name[..1].to_ascii_lowercase() + &name[1..]
-        };
-        describe_api!(@opg_path_insert_url_param $result $context name $parameter)
-    }};
-    (@opg_path_url_element $result:ident $context:ident {$name:ident: $parameter:path}) => {{
-        let name = stringify!($name).to_owned();
-        describe_api!(@opg_path_insert_url_param $result $context name $parameter)
-    }};
     (@opg_path_insert_url_param $result:ident $context:ident $name:ident $parameter:path) => {{
         $context.parameters.insert($name.clone(), $crate::models::OperationParameter {
             description: None,

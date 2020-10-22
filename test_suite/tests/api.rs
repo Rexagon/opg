@@ -61,7 +61,7 @@ mod tests {
                 }
             },
             paths: {
-                ("test"): {
+                ("test" / uuid::Uuid): {
                     POST: {
                         security: {
                             test_auth && "basicAuth"
@@ -124,7 +124,7 @@ tags:
 servers:
   - url: "https://my.super.server.com/v1"
 paths:
-  /test:
+  "/test/{uuid}":
     post:
       security:
         - basicAuth: []
@@ -145,6 +145,15 @@ paths:
                 type: array
                 items:
                   type: string
+    parameters:
+      - name: uuid
+        in: path
+        required: true
+        schema:
+          description: "UUID ver. 4 [rfc](https://tools.ietf.org/html/rfc4122)"
+          type: string
+          format: uuid
+          example: 00000000-0000-0000-0000-000000000000
   "/hello/world/{paramTest}":
     summary: Some test group of requests
     description: Another test description
