@@ -145,6 +145,7 @@ fn print_api() {
                     tags: {internal},
                     summary: "Small summary",
                     description: "Small description",
+                    deprecated: true,
                     parameters: {
                         (query someParam: u32): {
                             description: "Test",
@@ -194,6 +195,7 @@ paths:
         - internal
       summary: Small summary
       description: Small description
+      deprecated: true
       responses:
         200:
           description: OK
