@@ -13,7 +13,7 @@ mod tests {
         FinesOnIssuedLoansAndCredits = 55862,
         InterestIncomes = 700,
         CurrentAccounts = 651,
-        Pledge = 008,
+        Pledge = 8,
     }
 
     #[test]
@@ -46,7 +46,7 @@ oneOf:
     example: "651"
   - description: Pledge variant
     type: integer
-    example: "008""##
+    example: "8""##
         );
     }
 }

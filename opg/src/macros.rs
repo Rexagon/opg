@@ -490,8 +490,16 @@ macro_rules! describe_api {
     (@opg_path_value_properties $result:ident $context:ident $(,)?) => {};
 
 
-    (@opg_path_value_operation_properties $result:ident $context:ident $field:ident: $value:literal, $($other:tt)*) => {
-        $context.$field = Some($value.to_owned());
+    (@opg_path_value_operation_properties $result:ident $context:ident summary: $value:literal, $($other:tt)*) => {
+        $context.summary = Some($value.to_owned());
+        describe_api!(@opg_path_value_operation_properties $result $context $($other)*)
+    };
+    (@opg_path_value_operation_properties $result:ident $context:ident description: $value:literal, $($other:tt)*) => {
+        $context.description = Some($value.to_owned());
+        describe_api!(@opg_path_value_operation_properties $result $context $($other)*)
+    };
+    (@opg_path_value_operation_properties $result:ident $context:ident deprecated: $value:literal, $($other:tt)*) => {
+        $context.deprecated = $value;
         describe_api!(@opg_path_value_operation_properties $result $context $($other)*)
     };
     (@opg_path_value_operation_properties $result:ident $context:ident tags: {$($tag:ident),*$(,)?}, $($other:tt)*) => {
@@ -597,6 +605,7 @@ macro_rules! describe_api {
                 description: None,
                 parameter_in: $crate::models::ParameterIn::Header,
                 required: true,
+                deprecated: false,
                 schema: Some($result.components.mention_schema::<String>(false, &Default::default())),
             };
             describe_api!(@opg_path_value_parameter_properties $result parameter $($properties)*,);
@@ -610,6 +619,7 @@ macro_rules! describe_api {
                 description: None,
                 parameter_in: $crate::models::ParameterIn::Header,
                 required: true,
+                deprecated: false,
                 schema: Some($result.components.mention_schema::<String>(false, &Default::default())),
             };
             $context.parameters.insert($name.to_owned(), parameter);
@@ -622,6 +632,7 @@ macro_rules! describe_api {
                 description: None,
                 parameter_in: $crate::models::ParameterIn::Query,
                 required: false,
+                deprecated: false,
                 schema: Some($result.components.mention_schema::<$type>(false, &Default::default())),
             };
             describe_api!(@opg_path_value_parameter_properties $result parameter $($properties)*,);
@@ -635,6 +646,7 @@ macro_rules! describe_api {
                 description: None,
                 parameter_in: $crate::models::ParameterIn::Query,
                 required: false,
+                deprecated: false,
                 schema: Some($result.components.mention_schema::<$type>(false, &Default::default())),
             };
             $context.parameters.insert(stringify!($name).to_owned(), parameter);
@@ -650,6 +662,10 @@ macro_rules! describe_api {
     };
     (@opg_path_value_parameter_properties $result:ident $context:ident required: $value:literal, $($other:tt)*) => {
         $context.required = $value;
+        describe_api!(@opg_path_value_parameter_properties $result $context $($other)*)
+    };
+    (@opg_path_value_parameter_properties $result:ident $context:ident deprecated: $value:literal, $($other:tt)*) => {
+        $context.deprecated = $value;
         describe_api!(@opg_path_value_parameter_properties $result $context $($other)*)
     };
     (@opg_path_value_parameter_properties $result:ident $context:ident schema: $type:path, $($other:tt)*) => {
@@ -687,6 +703,7 @@ macro_rules! describe_api {
             description: None,
             parameter_in: $crate::models::ParameterIn::Path,
             required: true,
+            deprecated: false,
             schema: Some($result.components.mention_schema::<$parameter>(false, &Default::default()))
         });
         $crate::models::PathElement::Parameter($name)

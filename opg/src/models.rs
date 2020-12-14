@@ -254,6 +254,10 @@ pub struct Operation {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
 
+    /// Declares this operation to be deprecated
+    #[serde(skip_serializing_if = "is_false")]
+    pub deprecated: bool,
+
     /// A declaration of which security mechanisms can be used for this operation
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub security: Vec<BTreeMap<String, Vec<String>>>,
@@ -387,6 +391,8 @@ where
         parameter_in: ParameterIn,
         #[serde(skip_serializing_if = "is_false")]
         required: bool,
+        #[serde(skip_serializing_if = "is_false")]
+        deprecated: bool,
         #[serde(skip_serializing_if = "Option::is_none")]
         schema: &'a Option<ModelReference>,
     }
@@ -399,6 +405,7 @@ where
             description: &operation.description,
             parameter_in: operation.parameter_in,
             required: operation.required,
+            deprecated: operation.deprecated,
             schema: &operation.schema,
         })
     })?;
@@ -422,6 +429,9 @@ pub struct OperationParameter {
     /// If the parameter location is "path", this property is REQUIRED and its value MUST be true.
     /// Otherwise, the property MAY be included and its default value is false.
     pub required: bool,
+
+    /// Declares this parameter to be deprecated
+    pub deprecated: bool,
 
     /// The schema defining the type used for the parameter
     pub schema: Option<ModelReference>,

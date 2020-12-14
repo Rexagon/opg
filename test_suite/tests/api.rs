@@ -48,7 +48,7 @@ mod tests {
                 (http "bearerAuth"): {
                     scheme: Bearer,
                     bearer_format: "JWT",
-                    description: "Test description"
+                    description: "Test description",
                 },
                 (http "basicAuth"): {
                     scheme: Basic,
@@ -66,6 +66,7 @@ mod tests {
                         security: {
                             test_auth && "basicAuth"
                         },
+                        deprecated: true,
                         body: request::InModule,
                         200: std::vec::Vec<String>
                     }
@@ -87,6 +88,7 @@ mod tests {
                         parameters: {
                             (query someParam: u32): {
                                 description: "Test",
+                                deprecated: true
                             },
                         },
                         200("Custom response desc"): String
@@ -126,6 +128,7 @@ servers:
 paths:
   "/test/{uuid}":
     post:
+      deprecated: true
       security:
         - basicAuth: []
           test_auth: []
@@ -173,6 +176,7 @@ paths:
         - name: someParam
           description: Test
           in: query
+          deprecated: true
           schema:
             type: integer
             format: uint32
