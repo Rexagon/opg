@@ -332,9 +332,7 @@ macro_rules! impl_opg_model (
 macro_rules! describe_api {
     ($($property:ident: {$($property_value:tt)*}),*$(,)?) => {{
         let mut result = $crate::models::Opg::default();
-
         $(describe_api!(@opg_property result $property $($property_value)*));+;
-
         result
     }};
 
@@ -491,15 +489,15 @@ macro_rules! describe_api {
 
 
     (@opg_path_value_operation_properties $result:ident $context:ident summary: $value:literal, $($other:tt)*) => {
-        $context.summary = Some($value.to_owned());
+        $context.with_summary($value);
         describe_api!(@opg_path_value_operation_properties $result $context $($other)*)
     };
     (@opg_path_value_operation_properties $result:ident $context:ident description: $value:literal, $($other:tt)*) => {
-        $context.description = Some($value.to_owned());
+        $context.with_description($value);
         describe_api!(@opg_path_value_operation_properties $result $context $($other)*)
     };
     (@opg_path_value_operation_properties $result:ident $context:ident deprecated: $value:literal, $($other:tt)*) => {
-        $context.deprecated = $value;
+        $context.mark_deprecated($value);
         describe_api!(@opg_path_value_operation_properties $result $context $($other)*)
     };
     (@opg_path_value_operation_properties $result:ident $context:ident tags: {$($tag:ident),*$(,)?}, $($other:tt)*) => {
@@ -519,7 +517,7 @@ macro_rules! describe_api {
         let mut required = true;
         let schema = $crate::models::ParameterNotSpecified;
         describe_api!(@opg_path_value_body_properties $result description required schema $($body)*,);
-        $context.request_body = Some($crate::models::RequestBody {
+        $context.with_request_body($crate::models::RequestBody {
            description: description.or(Some(String::new())),
            required,
            schema, // schema must be specified
@@ -527,7 +525,7 @@ macro_rules! describe_api {
         describe_api!(@opg_path_value_operation_properties $result $context $($other)*)
     };
     (@opg_path_value_operation_properties $result:ident $context:ident body: $type:path, $($other:tt)*) => {
-        $context.request_body = Some($crate::models::RequestBody {
+        $context.with_request_body($crate::models::RequestBody {
            description: Some(String::new()),
            required: true,
            schema: $result.components.mention_schema::<$type>(false, &Default::default()),

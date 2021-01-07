@@ -277,6 +277,34 @@ pub struct Operation {
     pub parameters: BTreeMap<String, OperationParameter>,
 }
 
+impl Operation {
+    pub fn with_summary<T>(&mut self, summary: &T) -> &mut Self
+    where
+        T: ToString + ?Sized,
+    {
+        self.summary = Some(summary.to_string());
+        self
+    }
+
+    pub fn with_description<T>(&mut self, description: &T) -> &mut Self
+    where
+        T: ToString + ?Sized,
+    {
+        self.description = Some(description.to_string());
+        self
+    }
+
+    pub fn mark_deprecated(&mut self, deprecated: bool) -> &mut Self {
+        self.deprecated = deprecated;
+        self
+    }
+
+    pub fn with_request_body(&mut self, body: RequestBody) -> &mut Self {
+        self.request_body = Some(body);
+        self
+    }
+}
+
 /// Request Body Object
 ///
 /// [specification](https://swagger.io/specification/#request-body-object)
@@ -599,7 +627,7 @@ impl Model {
     }
 
     /// Try merge other model into this object
-    pub fn try_merge(&mut self, other: Model) -> Result<(), ()> {
+    pub fn try_merge(&mut self, other: Model) -> Result<(), ModelMergeError> {
         match &mut self.data {
             ModelData::Single(ModelType {
                 type_description: ModelTypeDescription::Object(self_object),
@@ -609,9 +637,9 @@ impl Model {
                     type_description: ModelTypeDescription::Object(other_object),
                     ..
                 }) => self_object.merge(other_object),
-                _ => Err(()),
+                _ => Err(ModelMergeError),
             },
-            _ => Err(()),
+            _ => Err(ModelMergeError),
         }
     }
 
@@ -620,6 +648,9 @@ impl Model {
         self.data.traverse(cx)
     }
 }
+
+#[derive(Debug, Copy, Clone)]
+pub struct ModelMergeError;
 
 /// Schema object representation
 #[derive(Debug, Clone, Serialize)]
@@ -843,10 +874,10 @@ impl ModelObject {
         property: String,
         property_type: ModelReference,
         is_required: bool,
-    ) -> Result<(), ()> {
+    ) -> Result<(), ModelMergeError> {
         let entry = match self.properties.entry(property.clone()) {
             Entry::Vacant(entry) => entry,
-            _ => return Err(()),
+            _ => return Err(ModelMergeError),
         };
 
         entry.insert(property_type);
@@ -859,7 +890,7 @@ impl ModelObject {
     }
 
     /// Merge other object into self
-    pub fn merge(&mut self, another: ModelObject) -> Result<(), ()> {
+    pub fn merge(&mut self, another: ModelObject) -> Result<(), ModelMergeError> {
         another
             .properties
             .into_iter()
@@ -869,7 +900,7 @@ impl ModelObject {
                         entry.insert(property_model);
                         Ok(())
                     }
-                    _ => Err(()),
+                    _ => Err(ModelMergeError),
                 },
             )?;
 
