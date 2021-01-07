@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use proc_macro2::{Group, Span, TokenStream, TokenTree};
-use syn::export::{Formatter, ToTokens};
+use quote::ToTokens;
 use syn::punctuated::Punctuated;
 use syn::Meta::*;
 use syn::NestedMeta::*;
@@ -692,7 +692,7 @@ enum AttrFrom {
 }
 
 impl std::fmt::Display for AttrFrom {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             AttrFrom::Serde => f.write_str(SERDE.inner()),
             AttrFrom::Opg => f.write_str(OPG.inner()),
