@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use syn::punctuated::Pair;
-use syn::{visit, visit::Visit};
+use syn::visit::{self, Visit};
 
 use crate::ast::{Container, Data};
 use crate::attr;
