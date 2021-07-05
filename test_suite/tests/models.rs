@@ -21,7 +21,8 @@ mod tests {
 description: New type description
 type: string
 format: uuid
-example: 000-000"##
+example: 000-000
+"##
         );
 
         assert_eq!(
@@ -30,7 +31,8 @@ example: 000-000"##
 description: Override description
 type: string
 format: uuid
-example: 000-000"##
+example: 000-000
+"##
         );
     }
 
@@ -56,7 +58,8 @@ properties:
   helloCamelCase:
     $ref: "#/components/schemas/NewType"
 required:
-  - asd"##
+  - asd
+"##
         );
     }
 
@@ -81,7 +84,8 @@ enum:
   - first
   - second
   - hello-world
-example: first"##
+example: first
+"##
         );
     }
 
@@ -107,7 +111,8 @@ additionalProperties:
         oneOf:
           - type: string
           - description: Second
-            type: string"##
+            type: string
+"##
         );
     }
 
@@ -152,7 +157,8 @@ oneOf:
         required:
           - asd
     required:
-      - another"##
+      - another
+"##
         );
     }
 
@@ -198,7 +204,8 @@ oneOf:
         example: another-test
     required:
       - field
-      - tag"##
+      - tag
+"##
         );
     }
 
@@ -234,7 +241,8 @@ properties:
     example: test
 required:
   - tag
-  - content"##
+  - content
+"##
         );
     }
 
@@ -256,7 +264,8 @@ properties:
   asd:
     type: integer
 required:
-  - asd"##
+  - asd
+"##
         );
     }
 
@@ -271,7 +280,8 @@ items:
   oneOf:
     - type: string
     - type: integer
-      format: uint64"##
+      format: uint64
+"##
         );
     }
 
@@ -303,7 +313,8 @@ properties:
     type: string
 required:
   - field
-  - boxed"##
+  - boxed
+"##
         );
     }
 
@@ -317,7 +328,8 @@ required:
 type: object
 additionalProperties:
   type: integer
-  format: int32"##
+  format: int32
+"##
         );
     }
 
@@ -332,7 +344,8 @@ additionalProperties:
             r##"---
 nullable: true
 type: integer
-format: int32"##
+format: int32
+"##
         );
     }
 
@@ -355,7 +368,8 @@ properties:
     type: integer
     format: int32
 required:
-  - field"##
+  - field
+"##
         );
     }
 
@@ -375,7 +389,8 @@ properties:
     nullable: true
     type: integer
 required:
-  - field"##
+  - field
+"##
         );
     }
 
@@ -421,7 +436,8 @@ required:
             r##"---
 type: integer
 format: uint64
-example: "1599083980""##
+example: "1599083980"
+"##
         );
     }
 
@@ -444,7 +460,8 @@ properties:
     type: integer
     format: int32
 required:
-  - body"##
+  - body
+"##
         );
     }
 
@@ -469,7 +486,8 @@ properties:
     format: int32
 required:
   - message
-  - test"##
+  - test
+"##
         );
     }
 
@@ -489,7 +507,8 @@ type: object
 properties:
   field: {}
 required:
-  - field"##
+  - field
+"##
         );
     }
 
@@ -502,7 +521,8 @@ required:
 description: "Always `null`"
 nullable: true
 type: string
-format: "null""##
+format: "null"
+"##
         );
     }
 
@@ -546,7 +566,8 @@ additionalProperties:
           type: string
       required:
         - pledgeCurrency
-        - pledgeAmount"##
+        - pledgeAmount
+"##
         );
     }
 
@@ -611,7 +632,8 @@ required:
   - amount
   - currency
   - paymentType
-  - status"##
+  - status
+"##
         );
     }
 
@@ -682,7 +704,8 @@ properties:
     type: string
 required:
   - id
-  - test"##
+  - test
+"##
         );
     }
 

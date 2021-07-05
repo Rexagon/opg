@@ -152,6 +152,7 @@ fn print_api() {
                         }
                     },
                     200: String,
+                    418 ("Optional response description"): String
                 },
                 POST: {
                     tags: {admin},

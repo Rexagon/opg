@@ -46,7 +46,8 @@ oneOf:
     example: "651"
   - description: Pledge variant
     type: integer
-    example: "8""##
+    example: "8"
+"##
         );
     }
 }

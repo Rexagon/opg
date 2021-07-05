@@ -35,9 +35,11 @@ mod tests {
             description: None,
         };
 
+        let title_as_variable = "My super API".to_owned();
+
         let test = describe_api! {
             info: {
-                title: "My super API",
+                title: title_as_variable,
                 version: "0.0.0",
             },
             tags: {internal, admin("Super admin methods")},
@@ -280,7 +282,8 @@ components:
     test_auth:
       type: apiKey
       in: query
-      name: X-MY-SUPER-API"##
+      name: X-MY-SUPER-API
+"##
         );
     }
 }

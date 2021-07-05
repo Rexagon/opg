@@ -337,16 +337,16 @@ macro_rules! describe_api {
     }};
 
 
-    (@opg_property $result:ident info $($property:ident: $property_value:literal),*$(,)?) => {{
+    (@opg_property $result:ident info $($property:ident: $property_value:expr),*$(,)?) => {{
         $(let $property = describe_api!(@opg_info_property $property $property_value));*;
         $result.info = $crate::models::Info {
             $($property,)*
             ..Default::default()
         };
     }};
-    (@opg_info_property title $value:literal) => { $value.to_owned() };
-    (@opg_info_property version $value:literal) => { $value.to_owned() };
-    (@opg_info_property description $value:literal) => { Some($value.to_owned()) };
+    (@opg_info_property title $value:expr) => { ($value).to_string() };
+    (@opg_info_property version $value:expr) => { ($value).to_string() };
+    (@opg_info_property description $value:expr) => { Some(($value).to_string()) };
 
 
     (@opg_property $result:ident tags $($tag:ident$(($description:literal))?),*$(,)?) => {{
@@ -359,7 +359,7 @@ macro_rules! describe_api {
     (@opg_property $result:ident servers $($url:literal$(($description:literal))?),*$(,)?) => {{
         $($result.servers.push($crate::models::Server {
             url: $url.to_owned(),
-            description: $crate::macros::FromStrangeTuple::extract(($($description.to_string(),)?)),
+            description: $crate::macros::FromStrangeTuple::extract(($($description.to_owned(),)?)),
         }));*;
     }};
 
