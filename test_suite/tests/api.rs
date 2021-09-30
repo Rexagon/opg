@@ -70,7 +70,17 @@ mod tests {
                         },
                         deprecated: true,
                         body: request::InModule,
-                        200: std::vec::Vec<String>
+                        200: std::vec::Vec<String>,
+                        callbacks: {
+                            myCallback: {
+                                ("callback_url"): {
+                                    POST: {
+                                        body: request::InModule,
+                                        200: std::vec::Vec<String>,
+                                    }
+                                }
+                            }
+                        }
                     }
                 },
                 ("hello" / "world" / { paramTest: String }): {
@@ -150,6 +160,26 @@ paths:
                 type: array
                 items:
                   type: string
+      callbacks:
+        myCallback:
+          /callback_url:
+            post:
+              requestBody:
+                required: true
+                description: ""
+                content:
+                  application/json:
+                    schema:
+                      $ref: "#/components/schemas/InModule"
+              responses:
+                200:
+                  description: OK
+                  content:
+                    application/json:
+                      schema:
+                        type: array
+                        items:
+                          type: string
     parameters:
       - name: uuid
         in: path

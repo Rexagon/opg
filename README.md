@@ -163,6 +163,15 @@ fn print_api() {
                         required: true,
                     },
                     200: SuperResponse,
+                    callbacks: {
+                        callbackUrl: {
+                            ("callbackUrl"): {
+                                POST: {
+                                    200: std::vec::Vec<String>,
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -204,6 +213,12 @@ paths:
             application/json:
               schema:
                 type: string
+        418:
+          description: Optional response description
+          content:
+            application/json:
+              schema:
+                type: string
       parameters:
         - name: someParam
           description: Test
@@ -230,6 +245,19 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuperResponse"
+      callbacks:
+        callbackUrl:
+          /callbackUrl:
+            post:
+              responses:
+                200:
+                  description: OK
+                  content:
+                    application/json:
+                      schema:
+                        type: array
+                        items:
+                          type: string
     parameters:
       - name: paramTest
         in: path
@@ -413,7 +441,7 @@ components:
           required:
             - another
   securitySchemes:
-    bearerAuth:
+    basicAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
