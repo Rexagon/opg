@@ -156,7 +156,7 @@ fn print_api() {
                 },
                 POST: {
                     tags: {admin},
-                    security: {"basicAuth"},
+                    security: {"bearerAuth"},
                     body: {
                         description: "Some interesting description",
                         schema: GenericStructWithRef<'static, i64>,
@@ -230,7 +230,7 @@ paths:
       tags:
         - admin
       security:
-        - basicAuth: []
+        - bearerAuth: []
       requestBody:
         required: true
         description: Some interesting description
@@ -441,7 +441,7 @@ components:
           required:
             - another
   securitySchemes:
-    basicAuth:
+    bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
