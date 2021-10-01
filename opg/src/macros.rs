@@ -508,6 +508,10 @@ macro_rules! describe_api {
         describe_api!(@opg_path_value_parameters $result $context $($parameters)*,);
         describe_api!(@opg_path_value_operation_properties $result $context $($other)*)
     };
+    (@opg_path_value_operation_properties $result:ident $context:ident callbacks: { $($callbacks:tt)* }, $($other:tt)*) => {
+        describe_api!(@opg_path_value_callbacks $result $context $($callbacks)*,);
+        describe_api!(@opg_path_value_operation_properties $result $context $($other)*)
+    };
     (@opg_path_value_operation_properties $result:ident $context:ident security: { $($security:tt)* }, $($other:tt)*) => {
         describe_api!(@opg_path_value_security $result $context $($security)*,);
         describe_api!(@opg_path_value_operation_properties $result $context $($other)*)
@@ -596,6 +600,35 @@ macro_rules! describe_api {
     };
     (@opg_path_value_body_properties $result:ident $description:ident $required:ident $schema:ident $(,)?) => {};
 
+    (@opg_path_value_callbacks $result:ident $context:ident $callback:literal: { $($operations:tt)* }, $($other:tt)*) => {
+        let mut callback_object = CallbackObject::default();
+        describe_api!(@opg_path_value_callbacks_paths $result callback_object $($other)*,);
+        $context.callbacks.insert($callback.to_owned(), callback_object);
+
+        describe_api!(@opg_path_value_callbacks $result $context $($other)*)
+    };
+    (@opg_path_value_callbacks $result:ident $context:ident $callback:ident: { $($paths:tt)* }, $($other:tt)*) => {
+        let mut callback_object = CallbackObject::default();
+        describe_api!(@opg_path_value_callbacks_paths $result callback_object $($paths)*,);
+        $context.callbacks.insert(stringify!($callback).to_owned(), callback_object);
+
+        describe_api!(@opg_path_value_callbacks $result $context $($other)*)
+    };
+    (@opg_path_value_callbacks $result:ident $context:ident $(,)?) => {};
+
+    (@opg_path_value_callbacks_paths $result:ident $context:ident $(($($path_segment:tt)+): {
+        $($properties:tt)*
+    }),*$(,)?) => {
+        $({
+            let mut path = Vec::new();
+            let mut context = $crate::models::PathValue::default();
+
+            describe_api!(@opg_property_url path $result context { $($path_segment)* });
+            describe_api!(@opg_path_value_properties $result context $($properties)*,);
+
+            $context.paths.push(($crate::models::Path(path), context));
+        };)*
+    };
 
     (@opg_path_value_parameters $result:ident $context:ident (header $name:literal): { $($properties:tt)* }, $($other:tt)*) => {
         {

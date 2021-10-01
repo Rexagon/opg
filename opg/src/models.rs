@@ -275,6 +275,10 @@ pub struct Operation {
         serialize_with = "serialize_parameters"
     )]
     pub parameters: BTreeMap<String, OperationParameter>,
+
+    /// A map of possible out-of band callbacks related to this operation
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub callbacks: BTreeMap<String, CallbackObject>,
 }
 
 impl Operation {
@@ -392,6 +396,20 @@ fn is_false(value: &bool) -> bool {
 #[derive(Serialize)]
 struct ResponseMediaType<'a> {
     schema: &'a ModelReference,
+}
+
+/// Callback Object
+///
+/// [specification](https://swagger.io/specification/#callback-object)
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct CallbackObject {
+    /// The available paths and operations for the API
+    #[serde(
+        flatten,
+        serialize_with = "serialize_ordered_entries",
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub paths: Vec<(Path, PathValue)>,
 }
 
 /// Content Object

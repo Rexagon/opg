@@ -156,13 +156,22 @@ fn print_api() {
                 },
                 POST: {
                     tags: {admin},
-                    security: {"basicAuth"},
+                    security: {"bearerAuth"},
                     body: {
                         description: "Some interesting description",
                         schema: GenericStructWithRef<'static, i64>,
                         required: true,
                     },
                     200: SuperResponse,
+                    callbacks: {
+                        callbackUrl: {
+                            ("callbackUrl"): {
+                                POST: {
+                                    200: std::vec::Vec<String>,
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -204,6 +213,12 @@ paths:
             application/json:
               schema:
                 type: string
+        418:
+          description: Optional response description
+          content:
+            application/json:
+              schema:
+                type: string
       parameters:
         - name: someParam
           description: Test
@@ -215,7 +230,7 @@ paths:
       tags:
         - admin
       security:
-        - basicAuth: []
+        - bearerAuth: []
       requestBody:
         required: true
         description: Some interesting description
@@ -230,6 +245,19 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuperResponse"
+      callbacks:
+        callbackUrl:
+          /callbackUrl:
+            post:
+              responses:
+                200:
+                  description: OK
+                  content:
+                    application/json:
+                      schema:
+                        type: array
+                        items:
+                          type: string
     parameters:
       - name: paramTest
         in: path
