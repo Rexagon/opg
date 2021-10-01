@@ -631,7 +631,7 @@ where
         .map(|field| {
             let field_model_reference = field_model_reference(
                 ContextParams::from(&field.attrs),
-                &field,
+                field,
                 inline_predicate(field),
             );
 

@@ -531,8 +531,7 @@ fn get_renames<'a>(
     cx: &ParsingContext,
     items: &'a Punctuated<syn::NestedMeta, syn::Token![,]>,
 ) -> Result<Option<&'a syn::LitStr>, ()> {
-    let ser = get_ser(cx, RENAME, items)?;
-    Ok(ser.at_most_one()?)
+    get_ser(cx, RENAME, items)?.at_most_one()
 }
 
 fn get_ser<'c, 'm>(

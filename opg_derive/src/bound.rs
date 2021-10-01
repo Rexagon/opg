@@ -41,7 +41,7 @@ pub fn with_bound(
             if let syn::Type::Path(ty) = ungroup(&field.ty) {
                 if let Some(Pair::Punctuated(t, _)) = ty.path.segments.pairs().next() {
                     if self.all_type_params.contains(&t.ident) {
-                        self.associated_type_usage.push(&ty);
+                        self.associated_type_usage.push(ty);
                     }
                 }
             }

@@ -524,7 +524,7 @@ impl Components {
     where
         M: OpgModel + ?Sized,
     {
-        let reference = M::select_reference(self, inline, &params);
+        let reference = M::select_reference(self, inline, params);
         if let ModelReference::Link(link) = &reference {
             if !self.schemas.contains_key(link) {
                 let structure = M::get_schema(self);
