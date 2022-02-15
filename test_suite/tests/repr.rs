@@ -18,9 +18,9 @@ mod tests {
 
     #[test]
     fn repr_enum() {
-        let mut cx = &mut Components::default();
+        let cx = &mut Components::default();
         assert_eq!(
-            serde_yaml::to_string(&LedgerAccountId::get_schema(&mut cx)).unwrap(),
+            serde_yaml::to_string(&LedgerAccountId::get_schema(cx)).unwrap(),
             r##"---
 oneOf:
   - description: IssuedLoansAndCredits variant

@@ -13,10 +13,10 @@ mod tests {
 
     #[test]
     fn newtype() {
-        let mut cx = Components::new();
+        let cx = &mut Components::new();
 
         assert_eq!(
-            serde_yaml::to_string(&NewType::get_schema(&mut cx)).unwrap(),
+            serde_yaml::to_string(&NewType::get_schema(cx)).unwrap(),
             r##"---
 description: New type description
 type: string
@@ -26,7 +26,7 @@ example: 000-000
         );
 
         assert_eq!(
-            serde_yaml::to_string(&NewNewType::get_schema(&mut cx)).unwrap(),
+            serde_yaml::to_string(&NewNewType::get_schema(cx)).unwrap(),
             r##"---
 description: Override description
 type: string
@@ -46,9 +46,9 @@ example: 000-000
 
     #[test]
     fn simple_struct() {
-        let mut cx = &mut Components::default();
+        let cx = &mut Components::default();
         assert_eq!(
-            serde_yaml::to_string(&SimpleStruct::get_schema(&mut cx)).unwrap(),
+            serde_yaml::to_string(&SimpleStruct::get_schema(cx)).unwrap(),
             r##"---
 type: object
 properties:
@@ -74,9 +74,9 @@ required:
 
     #[test]
     fn string_enum() {
-        let mut cx = &mut Components::default();
+        let cx = &mut Components::default();
         assert_eq!(
-            serde_yaml::to_string(&StringEnumTest::get_schema(&mut cx)).unwrap(),
+            serde_yaml::to_string(&StringEnumTest::get_schema(cx)).unwrap(),
             r##"---
 description: New type description
 type: string
@@ -98,9 +98,9 @@ example: first
 
     #[test]
     fn externally_enum() {
-        let mut cx = &mut Components::default();
+        let cx = &mut Components::default();
         assert_eq!(
-            serde_yaml::to_string(&ExternallyTaggedEnum::get_schema(&mut cx)).unwrap(),
+            serde_yaml::to_string(&ExternallyTaggedEnum::get_schema(cx)).unwrap(),
             r##"---
 type: object
 additionalProperties:
@@ -131,9 +131,9 @@ additionalProperties:
 
     #[test]
     fn untagged_enum() {
-        let mut cx = &mut Components::default();
+        let cx = &mut Components::default();
         assert_eq!(
-            serde_yaml::to_string(&UntaggedEnumTest::get_schema(&mut cx)).unwrap(),
+            serde_yaml::to_string(&UntaggedEnumTest::get_schema(cx)).unwrap(),
             r##"---
 oneOf:
   - type: object
@@ -171,9 +171,9 @@ oneOf:
 
     #[test]
     fn internally_tagged_enum() {
-        let mut cx = &mut Components::default();
+        let cx = &mut Components::default();
         assert_eq!(
-            serde_yaml::to_string(&InternallyTaggedEnum::get_schema(&mut cx)).unwrap(),
+            serde_yaml::to_string(&InternallyTaggedEnum::get_schema(cx)).unwrap(),
             r##"---
 oneOf:
   - type: object
@@ -218,9 +218,9 @@ oneOf:
 
     #[test]
     fn adjacently_tagged_enum() {
-        let mut cx = &mut Components::default();
+        let cx = &mut Components::default();
         assert_eq!(
-            serde_yaml::to_string(&AdjacentlyTaggedEnum::get_schema(&mut cx)).unwrap(),
+            serde_yaml::to_string(&AdjacentlyTaggedEnum::get_schema(cx)).unwrap(),
             r##"---
 type: object
 properties:
@@ -255,9 +255,9 @@ required:
 
     #[test]
     fn type_changed_field() {
-        let mut cx = &mut Components::default();
+        let cx = &mut Components::default();
         assert_eq!(
-            serde_yaml::to_string(&TypeChangedStruct::get_schema(&mut cx)).unwrap(),
+            serde_yaml::to_string(&TypeChangedStruct::get_schema(cx)).unwrap(),
             r##"---
 type: object
 properties:
@@ -271,9 +271,9 @@ required:
 
     #[test]
     fn tuples() {
-        let mut cx = &mut Components::default();
+        let cx = &mut Components::default();
         assert_eq!(
-            serde_yaml::to_string(&<(String, u64)>::get_schema(&mut cx)).unwrap(),
+            serde_yaml::to_string(&<(String, u64)>::get_schema(cx)).unwrap(),
             r##"---
 type: array
 items:
@@ -295,9 +295,9 @@ items:
 
     #[test]
     fn inner_type() {
-        let mut cx = &mut Components::default();
+        let cx = &mut Components::default();
         assert_eq!(
-            serde_yaml::to_string(&StructWithInner::get_schema(&mut cx)).unwrap(),
+            serde_yaml::to_string(&StructWithInner::get_schema(cx)).unwrap(),
             r##"---
 type: object
 properties:
@@ -320,10 +320,9 @@ required:
 
     #[test]
     fn hash_map() {
-        let mut cx = &mut Components::default();
+        let cx = &mut Components::default();
         assert_eq!(
-            serde_yaml::to_string(&std::collections::HashMap::<&str, i32>::get_schema(&mut cx))
-                .unwrap(),
+            serde_yaml::to_string(&std::collections::HashMap::<&str, i32>::get_schema(cx)).unwrap(),
             r##"---
 type: object
 additionalProperties:
@@ -338,9 +337,9 @@ additionalProperties:
 
     #[test]
     fn nullable_newtype() {
-        let mut cx = &mut Components::default();
+        let cx = &mut Components::default();
         assert_eq!(
-            serde_yaml::to_string(&NullableNewtype::get_schema(&mut cx)).unwrap(),
+            serde_yaml::to_string(&NullableNewtype::get_schema(cx)).unwrap(),
             r##"---
 nullable: true
 type: integer
@@ -357,9 +356,9 @@ format: int32
 
     #[test]
     fn nullable_field() {
-        let mut cx = &mut Components::default();
+        let cx = &mut Components::default();
         assert_eq!(
-            serde_yaml::to_string(&StructWithNullable::get_schema(&mut cx)).unwrap(),
+            serde_yaml::to_string(&StructWithNullable::get_schema(cx)).unwrap(),
             r##"---
 type: object
 properties:
@@ -379,9 +378,9 @@ required:
     }
 
     fn recursive_field() {
-        let mut cx = &mut Components::default();
+        let cx = &mut Components::default();
         assert_eq!(
-            serde_yaml::to_string(&Recursive::get_schema(&mut cx)).unwrap(),
+            serde_yaml::to_string(&Recursive::get_schema(cx)).unwrap(),
             r##"---
 type: object
 properties:
@@ -430,9 +429,9 @@ required:
 
     #[test]
     fn example_with() {
-        let mut cx = &mut Components::default();
+        let cx = &mut Components::default();
         assert_eq!(
-            serde_yaml::to_string(&ExampleWith::get_schema(&mut cx)).unwrap(),
+            serde_yaml::to_string(&ExampleWith::get_schema(cx)).unwrap(),
             r##"---
 type: integer
 format: uint64
@@ -449,9 +448,9 @@ example: "1599083980"
 
     #[test]
     fn generic_struct() {
-        let mut cx = &mut Components::default();
+        let cx = &mut Components::default();
         assert_eq!(
-            serde_yaml::to_string(&GenericStruct::<i32>::get_schema(&mut cx)).unwrap(),
+            serde_yaml::to_string(&GenericStruct::<i32>::get_schema(cx)).unwrap(),
             r##"---
 description: Test
 type: object
@@ -473,9 +472,9 @@ required:
 
     #[test]
     fn generic_struct_with_ref() {
-        let mut cx = &mut Components::default();
+        let cx = &mut Components::default();
         assert_eq!(
-            serde_yaml::to_string(&GenericStructWithRef::<i32>::get_schema(&mut cx)).unwrap(),
+            serde_yaml::to_string(&GenericStructWithRef::<i32>::get_schema(cx)).unwrap(),
             r##"---
 type: object
 properties:
@@ -499,9 +498,9 @@ required:
 
     #[test]
     fn struct_with_any_field() {
-        let mut cx = Components::default();
+        let cx = &mut Components::default();
         assert_eq!(
-            serde_yaml::to_string(&StructWithAny::get_schema(&mut cx)).unwrap(),
+            serde_yaml::to_string(&StructWithAny::get_schema(cx)).unwrap(),
             r##"---
 type: object
 properties:
@@ -514,9 +513,9 @@ required:
 
     #[test]
     fn null_response() {
-        let mut cx = Components::default();
+        let cx = &mut Components::default();
         assert_eq!(
-            serde_yaml::to_string(&<()>::get_schema(&mut cx)).unwrap(),
+            serde_yaml::to_string(&<()>::get_schema(cx)).unwrap(),
             r##"---
 description: "Always `null`"
 nullable: true
@@ -528,9 +527,9 @@ format: "null"
 
     #[test]
     fn complex_enum() {
-        let mut cx = &mut Components::default();
+        let cx = &mut Components::default();
         assert_eq!(
-            serde_yaml::to_string(&CreditHistoryMetaResponse::get_schema(&mut cx)).unwrap(),
+            serde_yaml::to_string(&CreditHistoryMetaResponse::get_schema(cx)).unwrap(),
             r##"---
 description: Credit history kind
 type: object
