@@ -172,7 +172,7 @@ impl OpgModel for chrono::NaiveDateTime {
 }
 
 #[cfg(feature = "chrono")]
-impl OpgModel for chrono::DateTime<chrono::Utc> {
+impl<TZ: chrono::TimeZone> OpgModel for chrono::DateTime<TZ> {
     fn get_schema(_: &mut Components) -> Model {
         Model {
             description: Some("Datetime with timezone".to_owned()),
