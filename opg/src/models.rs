@@ -724,26 +724,6 @@ impl From<ModelOneOf> for ModelData {
 /// allOf
 #[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ModelAnyOf {
-    pub any_of: Vec<ModelReference>,
-}
-
-impl ModelAnyOf {
-    /// Check links
-    fn traverse<'a>(&'a self, cx: TraverseContext<'a>) -> Result<(), &'a str> {
-        self.any_of.iter().try_for_each(|item| item.traverse(cx))
-    }
-}
-
-impl From<ModelAnyOf> for ModelData {
-    fn from(data: ModelAnyOf) -> Self {
-        ModelData::AnyOf(data)
-    }
-}
-
-/// allOf
-#[derive(Debug, Clone, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct ModelAllOf {
     pub all_of: Vec<ModelReference>,
 }
@@ -758,6 +738,26 @@ impl ModelAllOf {
 impl From<ModelAllOf> for ModelData {
     fn from(data: ModelAllOf) -> Self {
         ModelData::AllOf(data)
+    }
+}
+
+/// anyOf
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelAnyOf {
+    pub any_of: Vec<ModelReference>,
+}
+
+impl ModelAnyOf {
+    /// Check links
+    fn traverse<'a>(&'a self, cx: TraverseContext<'a>) -> Result<(), &'a str> {
+        self.any_of.iter().try_for_each(|item| item.traverse(cx))
+    }
+}
+
+impl From<ModelAnyOf> for ModelData {
+    fn from(data: ModelAnyOf) -> Self {
+        ModelData::AnyOf(data)
     }
 }
 
