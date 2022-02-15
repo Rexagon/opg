@@ -676,6 +676,8 @@ pub struct ModelMergeError;
 pub enum ModelData {
     Single(ModelType),
     OneOf(ModelOneOf),
+    AllOf(ModelAllOf),
+    AnyOf(ModelAnyOf),
 }
 
 impl ModelData {
@@ -684,7 +686,7 @@ impl ModelData {
     pub fn apply_params(self, params: &ContextParams) -> Self {
         match self {
             ModelData::Single(data) => ModelData::Single(data.apply_params(params)),
-            one_of => one_of, // TODO: apply params to oneOf
+            data => data, // TODO: apply params to oneOf, anyOf, and allOf
         }
     }
 
@@ -693,6 +695,8 @@ impl ModelData {
         match self {
             ModelData::Single(single) => single.traverse(cx),
             ModelData::OneOf(one_of) => one_of.traverse(cx),
+            ModelData::AllOf(all_of) => all_of.traverse(cx),
+            ModelData::AnyOf(any_of) => any_of.traverse(cx),
         }
     }
 }
@@ -714,6 +718,46 @@ impl ModelOneOf {
 impl From<ModelOneOf> for ModelData {
     fn from(data: ModelOneOf) -> Self {
         ModelData::OneOf(data)
+    }
+}
+
+/// allOf
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelAllOf {
+    pub all_of: Vec<ModelReference>,
+}
+
+impl ModelAllOf {
+    /// Check links
+    fn traverse<'a>(&'a self, cx: TraverseContext<'a>) -> Result<(), &'a str> {
+        self.all_of.iter().try_for_each(|item| item.traverse(cx))
+    }
+}
+
+impl From<ModelAllOf> for ModelData {
+    fn from(data: ModelAllOf) -> Self {
+        ModelData::AllOf(data)
+    }
+}
+
+/// anyOf
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelAnyOf {
+    pub any_of: Vec<ModelReference>,
+}
+
+impl ModelAnyOf {
+    /// Check links
+    fn traverse<'a>(&'a self, cx: TraverseContext<'a>) -> Result<(), &'a str> {
+        self.any_of.iter().try_for_each(|item| item.traverse(cx))
+    }
+}
+
+impl From<ModelAnyOf> for ModelData {
+    fn from(data: ModelAnyOf) -> Self {
+        ModelData::AnyOf(data)
     }
 }
 
