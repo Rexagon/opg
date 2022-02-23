@@ -1,6 +1,6 @@
 #[allow(dead_code)]
 mod tests {
-    
+
     use opg::*;
     use serde_repr::Serialize_repr;
 

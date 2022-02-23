@@ -1,6 +1,6 @@
 #[allow(dead_code)]
 mod tests {
-    
+
     use opg::*;
     use serde::{Deserialize, Serialize};
 
