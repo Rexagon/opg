@@ -37,6 +37,7 @@ mod tests {
         };
 
         let title_as_variable = "My super API".to_owned();
+        let server_as_variable = "http://test/123";
 
         let test = describe_api! {
             info: {
@@ -45,7 +46,8 @@ mod tests {
             },
             tags: {internal, admin("Super admin methods")},
             servers: {
-                "https://my.super.server.com/v1"
+                "https://my.super.server.com/v1",
+                server_as_variable
             },
             security_schemes: {
                 (http "bearerAuth"): {
@@ -138,6 +140,7 @@ tags:
   - name: internal
 servers:
   - url: "https://my.super.server.com/v1"
+  - url: "http://test/123"
 paths:
   "/test/{uuid}":
     post:
