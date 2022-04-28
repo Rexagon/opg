@@ -72,16 +72,46 @@ impl_opg_model!(generic_array: std::collections::LinkedList<T>);
 impl_opg_model!(generic_array: std::collections::VecDeque<T>);
 impl_opg_model!(generic_array: std::collections::BinaryHeap<T>);
 
+#[cfg(not(feature = "const_generics"))]
 macro_rules! array_impls {
     ($($len:tt)+) => {
         $(impl_opg_model!(generic_array: [T; $len]);)*
     };
 }
+#[cfg(not(feature = "const_generics"))]
 array_impls! {
     01 02 03 04 05 06 07 08 09 10
     11 12 13 14 15 16 17 18 19 20
     21 22 23 24 25 26 27 28 29 30
     31 32
+}
+
+#[cfg(feature = "const_generics")]
+impl<T, const N: usize> OpgModel for [T; N]
+where
+    T: OpgModel,
+{
+    fn get_schema(cx: &mut Components) -> Model {
+        Model {
+            description: None,
+            data: ModelData::Single(ModelType {
+                nullable: false,
+                type_description: ModelTypeDescription::Array(ModelArray {
+                    items: Box::new(cx.mention_schema::<T>(false, &Default::default())),
+                }),
+            }),
+        }
+    }
+
+    #[inline]
+    fn type_name() -> Option<Cow<'static, str>> {
+        None
+    }
+
+    #[inline]
+    fn select_reference(cx: &mut Components, _: bool, params: &ContextParams) -> ModelReference {
+        ModelReference::Inline(Self::get_schema(cx).apply_params(params))
+    }
 }
 
 impl_opg_model!(generic_dictionary: std::collections::HashMap<K, T>);

@@ -220,13 +220,13 @@ macro_rules! impl_opg_model (
             }
 
             #[inline]
-            fn select_reference(cx: &mut $crate::Components, _: bool, params: &$crate::ContextParams) -> $crate::ModelReference {
-                $crate::ModelReference::Inline(Self::get_schema(cx).apply_params(params))
+            fn type_name() -> Option<std::borrow::Cow<'static, str>> {
+                None
             }
 
             #[inline]
-            fn type_name() -> Option<std::borrow::Cow<'static, str>> {
-                None
+            fn select_reference(cx: &mut $crate::Components, _: bool, params: &$crate::ContextParams) -> $crate::ModelReference {
+                $crate::ModelReference::Inline(Self::get_schema(cx).apply_params(params))
             }
         }
     };
@@ -250,13 +250,13 @@ macro_rules! impl_opg_model (
             }
 
             #[inline]
-            fn select_reference(cx: &mut $crate::Components, _: bool, params: &$crate::ContextParams) -> $crate::ModelReference {
-                $crate::ModelReference::Inline(Self::get_schema(cx).apply_params(params))
+            fn type_name() -> Option<std::borrow::Cow<'static, str>> {
+                None
             }
 
             #[inline]
-            fn type_name() -> Option<std::borrow::Cow<'static, str>> {
-                None
+            fn select_reference(cx: &mut $crate::Components, _: bool, params: &$crate::ContextParams) -> $crate::ModelReference {
+                $crate::ModelReference::Inline(Self::get_schema(cx).apply_params(params))
             }
         }
     };
@@ -281,13 +281,13 @@ macro_rules! impl_opg_model (
             }
 
             #[inline]
-            fn select_reference(cx: &mut $crate::Components, _: bool, params: &$crate::ContextParams) -> $crate::ModelReference {
-                $crate::ModelReference::Inline(Self::get_schema(cx).apply_params(params))
+            fn type_name() -> Option<std::borrow::Cow<'static, str>> {
+                None
             }
 
             #[inline]
-            fn type_name() -> Option<std::borrow::Cow<'static, str>> {
-                None
+            fn select_reference(cx: &mut $crate::Components, _: bool, params: &$crate::ContextParams) -> $crate::ModelReference {
+                $crate::ModelReference::Inline(Self::get_schema(cx).apply_params(params))
             }
         }
     };
@@ -316,13 +316,13 @@ macro_rules! impl_opg_model (
             }
 
             #[inline]
-            fn select_reference(cx: &mut $crate::Components, _: bool, params: &$crate::ContextParams) -> $crate::ModelReference {
-                $crate::ModelReference::Inline(Self::get_schema(cx).apply_params(params))
+            fn type_name() -> Option<std::borrow::Cow<'static, str>> {
+                None
             }
 
             #[inline]
-            fn type_name() -> Option<std::borrow::Cow<'static, str>> {
-                None
+            fn select_reference(cx: &mut $crate::Components, _: bool, params: &$crate::ContextParams) -> $crate::ModelReference {
+                $crate::ModelReference::Inline(Self::get_schema(cx).apply_params(params))
             }
         }
     };
