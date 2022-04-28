@@ -1,9 +1,11 @@
-pub mod macros;
-pub mod models;
+use std::borrow::Cow;
 
 pub use macros::*;
 pub use models::*;
 pub use opg_derive::OpgModel;
+
+pub mod macros;
+pub mod models;
 
 pub const OPENAPI_VERSION: &str = "3.0.3";
 pub const SCHEMA_REFERENCE_PREFIX: &str = "#/components/schemas/";
@@ -103,7 +105,7 @@ impl OpgModel for () {
     }
 
     #[inline]
-    fn type_name() -> Option<&'static str> {
+    fn type_name() -> Option<Cow<'static, str>> {
         None
     }
 
@@ -132,7 +134,7 @@ impl OpgModel for uuid::Uuid {
     }
 
     #[inline]
-    fn type_name() -> Option<&'static str> {
+    fn type_name() -> Option<Cow<'static, str>> {
         None
     }
 
@@ -161,7 +163,7 @@ impl OpgModel for chrono::NaiveDateTime {
     }
 
     #[inline]
-    fn type_name() -> Option<&'static str> {
+    fn type_name() -> Option<Cow<'static, str>> {
         None
     }
 
@@ -190,7 +192,7 @@ impl<TZ: chrono::TimeZone> OpgModel for chrono::DateTime<TZ> {
     }
 
     #[inline]
-    fn type_name() -> Option<&'static str> {
+    fn type_name() -> Option<Cow<'static, str>> {
         None
     }
 

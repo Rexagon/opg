@@ -779,7 +779,7 @@ fn implement_type(
     let inline = if inline {
         quote! {
             #[inline]
-            fn type_name() -> Option<&'static str> {
+            fn type_name() -> Option<std::borrow::Cow<'static, str>> {
                 None
             }
 
@@ -791,8 +791,8 @@ fn implement_type(
     } else {
         quote! {
             #[inline]
-            fn type_name() -> Option<&'static str> {
-                Some(stringify!(#type_name))
+            fn type_name() -> Option<std::borrow::Cow<'static, str>> {
+                Some(stringify!(#type_name).into())
             }
         }
     };

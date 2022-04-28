@@ -177,7 +177,7 @@ macro_rules! impl_opg_model (
             }
 
             #[inline]
-            fn type_name() -> Option<&'static str> {
+            fn type_name() -> Option<std::borrow::Cow<'static, str>> {
                 <T as $crate::OpgModel>::type_name()
             }
         }
@@ -193,7 +193,7 @@ macro_rules! impl_opg_model (
             }
 
             #[inline]
-            fn type_name() -> Option<&'static str> {
+            fn type_name() -> Option<std::borrow::Cow<'static, str>> {
                 <T as $crate::OpgModel>::type_name()
             }
         }
@@ -225,7 +225,7 @@ macro_rules! impl_opg_model (
             }
 
             #[inline]
-            fn type_name() -> Option<&'static str> {
+            fn type_name() -> Option<std::borrow::Cow<'static, str>> {
                 None
             }
         }
@@ -255,7 +255,7 @@ macro_rules! impl_opg_model (
             }
 
             #[inline]
-            fn type_name() -> Option<&'static str> {
+            fn type_name() -> Option<std::borrow::Cow<'static, str>> {
                 None
             }
         }
@@ -286,7 +286,7 @@ macro_rules! impl_opg_model (
             }
 
             #[inline]
-            fn type_name() -> Option<&'static str> {
+            fn type_name() -> Option<std::borrow::Cow<'static, str>> {
                 None
             }
         }
@@ -301,7 +301,7 @@ macro_rules! impl_opg_model (
             }
 
             #[inline]
-            fn type_name() -> Option<&'static str> {
+            fn type_name() -> Option<std::borrow::Cow<'static, str>> {
                 <T as $crate::OpgModel>::type_name()
             }
         }
@@ -321,7 +321,7 @@ macro_rules! impl_opg_model (
             }
 
             #[inline]
-            fn type_name() -> Option<&'static str> {
+            fn type_name() -> Option<std::borrow::Cow<'static, str>> {
                 None
             }
         }

@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::{btree_map::Entry, BTreeMap};
 use std::fmt::Write;
 
@@ -577,7 +578,7 @@ pub trait OpgModel {
     fn get_schema(cx: &mut Components) -> Model;
 
     /// Get name of this type
-    fn type_name() -> Option<&'static str>;
+    fn type_name() -> Option<Cow<'static, str>>;
 
     /// Get schema for this type with context parameters applied
     fn get_schema_with_params(cx: &mut Components, params: &ContextParams) -> Model {
@@ -592,7 +593,7 @@ pub trait OpgModel {
         params: &ContextParams,
     ) -> ModelReference {
         match Self::type_name() {
-            Some(link) if !inline => ModelReference::Link(link.to_owned()),
+            Some(link) if !inline => ModelReference::Link(link.into_owned()),
             _ => ModelReference::Inline(Self::get_schema(cx).apply_params(params)),
         }
     }
