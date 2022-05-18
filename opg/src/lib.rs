@@ -231,3 +231,32 @@ impl<TZ: chrono::TimeZone> OpgModel for chrono::DateTime<TZ> {
         ModelReference::Inline(Self::get_schema(cx).apply_params(params))
     }
 }
+
+#[cfg(feature = "chrono")]
+impl OpgModel for chrono::NaiveDate {
+    fn get_schema(_: &mut Components) -> Model {
+        Model {
+            description: Some("Date without timezone".to_owned()),
+            data: ModelData::Single(ModelType {
+                nullable: false,
+                type_description: ModelTypeDescription::String(ModelString {
+                    variants: None,
+                    data: ModelSimple {
+                        format: Some("date".to_owned()),
+                        example: Some("2020-06-26".to_owned()),
+                    },
+                }),
+            }),
+        }
+    }
+
+    #[inline]
+    fn type_name() -> Option<Cow<'static, str>> {
+        None
+    }
+
+    #[inline]
+    fn select_reference(cx: &mut Components, _: bool, params: &ContextParams) -> ModelReference {
+        ModelReference::Inline(Self::get_schema(cx).apply_params(params))
+    }
+}
