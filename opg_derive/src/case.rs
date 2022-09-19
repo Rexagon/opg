@@ -4,7 +4,7 @@ use self::RenameRule::*;
 
 /// The different possible ways to change case of fields in a struct, or variants in an enum.
 #[allow(clippy::upper_case_acronyms)]
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum RenameRule {
     /// Don't apply a default rename rule.
     None,
