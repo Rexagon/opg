@@ -20,7 +20,7 @@ proc-macro2 = "1.0"
 either = "1.5"
 
 [dev-dependencies]
-opg = { version = "0.1", path = "../opg" }
+opg = { version = "0.2", path = "../opg" }
 
 [package.metadata.docs.rs]
 targets = ["x86_64-unknown-linux-gnu"]
