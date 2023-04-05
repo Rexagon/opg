@@ -990,8 +990,7 @@ impl ModelObject {
     /// Check links
     fn traverse<'a>(&'a self, cx: TraverseContext<'a>) -> Result<(), &'a str> {
         self.properties
-            .iter()
-            .map(|(_, reference)| reference)
+            .values()
             .chain(self.additional_properties.iter().map(|item| item.as_ref()))
             .try_for_each(|reference| reference.traverse(cx))
     }
