@@ -494,6 +494,10 @@ macro_rules! describe_api {
         $context.with_summary($value);
         $crate::describe_api!(@opg_path_value_operation_properties $result $context $($other)*)
     };
+    (@opg_path_value_operation_properties $result:ident $context:ident operationId: $value:expr, $($other:tt)*) => {
+        $context.with_operation_id($value);
+        $crate::describe_api!(@opg_path_value_operation_properties $result $context $($other)*)
+    };
     (@opg_path_value_operation_properties $result:ident $context:ident description: $value:expr, $($other:tt)*) => {
         $context.with_description($value);
         $crate::describe_api!(@opg_path_value_operation_properties $result $context $($other)*)
