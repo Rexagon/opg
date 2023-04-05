@@ -250,7 +250,7 @@ pub struct Operation {
     /// A short summary of what the operation does
     #[serde(skip_serializing_if = "Option::is_none")]
     pub summary: Option<String>,
-    
+
     /// Unique string used to identify the operation.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub operation_id: Option<String>,
@@ -294,7 +294,7 @@ impl Operation {
         self.summary = Some(summary.to_string());
         self
     }
-    
+
     pub fn with_operation_id<T>(&mut self, operation_id: &T) -> &mut Self
     where
         T: ToString + ?Sized,
