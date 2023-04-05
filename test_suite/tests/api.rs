@@ -68,6 +68,7 @@ mod tests {
             paths: {
                 ("test" / uuid::Uuid): {
                     POST: {
+                        operationId: "test",
                         security: {
                             test_auth && "basicAuth"
                         },
@@ -97,6 +98,7 @@ mod tests {
                         (header "asd")
                     },
                     GET: {
+                        operationId: "testGet",
                         tags: {internal},
                         summary: "Small summary",
                         description: "Small description",
@@ -109,6 +111,7 @@ mod tests {
                         200("Custom response desc"): String
                     },
                     POST: {
+                        operationId: "testPost",
                         tags: {admin},
                         body: {
                             description: "Some interesting description",
@@ -144,6 +147,7 @@ servers:
 paths:
   "/test/{uuid}":
     post:
+      operationId: test
       deprecated: true
       security:
         - basicAuth: []
@@ -200,6 +204,7 @@ paths:
       tags:
         - internal
       summary: Small summary
+      operationId: testGet
       description: Small description
       responses:
         200:
@@ -219,6 +224,7 @@ paths:
     post:
       tags:
         - admin
+      operationId: testPost
       requestBody:
         required: true
         description: Some interesting description
